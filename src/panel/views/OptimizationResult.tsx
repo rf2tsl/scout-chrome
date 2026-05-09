@@ -1,14 +1,12 @@
-import { useCallback, useMemo } from "react";
+import { useCallback } from "react";
 import { Alert, Box, Button, Stack, Typography } from "@mui/material";
-import DOMPurify from "isomorphic-dompurify";
-import { marked } from "marked";
 import { apiFetchBlob } from "@/shared/api";
 import type { ActiveJob } from "@/shared/jobStore";
 import { PopupShell } from "../components/PopupShell";
 import { DetectedJobCard } from "../components/DetectedJobCard";
-import { SectionLabel } from "../components/SectionLabel";
+import { OptimizationResultView } from "../components/OptimizationResultView";
 import { ACCENT, BORDER, DIM, FAINT, MUTED, SURFACE, TEXT } from "../theme";
-import { Card, PaddedCard, SpinnerRing } from "../styled";
+import { PaddedCard, SpinnerRing } from "../styled";
 
 interface Props {
   job: Extract<ActiveJob, { kind: "optimizing" | "completed" | "failed" }>;
@@ -148,75 +146,11 @@ export function OptimizationResult({ job, onBack }: Props) {
       )}
 
       {job.kind === "completed" && (
-        <DoneView
+        <OptimizationResultView
           changeSummary={job.summary.changeSummary}
           recruiterReview={job.summary.recruiterReview}
         />
       )}
     </PopupShell>
-  );
-}
-
-function DoneView({
-  changeSummary,
-  recruiterReview,
-}: {
-  changeSummary: string[];
-  recruiterReview: string;
-}) {
-  const reviewHtml = useMemo(() => {
-    const raw = recruiterReview || "";
-    if (!raw.trim()) return "";
-    return DOMPurify.sanitize(marked.parse(raw, { async: false }) as string);
-  }, [recruiterReview]);
-
-  return (
-    <>
-      {changeSummary.length > 0 && (
-        <>
-          <SectionLabel hint={`${changeSummary.length} edits`}>What changed</SectionLabel>
-          <Card>
-            <Stack spacing={0.75}>
-              {changeSummary.map((line, i) => (
-                <Stack key={i} direction="row" spacing={1} alignItems="flex-start">
-                  <Box sx={{ color: ACCENT, fontSize: 11, lineHeight: 1.55, flexShrink: 0 }}>+</Box>
-                  <Typography sx={{ fontSize: 11, color: DIM, lineHeight: 1.55 }}>
-                    {line}
-                  </Typography>
-                </Stack>
-              ))}
-            </Stack>
-          </Card>
-        </>
-      )}
-
-      {reviewHtml && (
-        <>
-          <SectionLabel>10-second recruiter review</SectionLabel>
-          <Card>
-            <Box
-              sx={{
-                fontSize: 11,
-                lineHeight: 1.55,
-                color: DIM,
-                "& p": { margin: "5px 0" },
-                "& ol, & ul": { paddingLeft: 2.5, margin: "5px 0" },
-                "& strong": { color: TEXT, fontWeight: 600 },
-                "& em": { color: ACCENT, fontStyle: "normal" },
-              }}
-              dangerouslySetInnerHTML={{ __html: reviewHtml }}
-            />
-          </Card>
-        </>
-      )}
-
-      {!changeSummary.length && !reviewHtml && (
-        <Card>
-          <Typography sx={{ fontSize: 12, color: FAINT, textAlign: "center", py: 2 }}>
-            No edits returned. Try a different listing.
-          </Typography>
-        </Card>
-      )}
-    </>
   );
 }
