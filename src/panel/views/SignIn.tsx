@@ -1,6 +1,7 @@
 import { Box, Button, Stack, Typography } from "@mui/material";
 import { ACCENT, BORDER_HI, DIM, FAINT, MUTED, SURFACE, TEXT } from "../theme";
 import { PopupShell } from "../components/PopupShell";
+import { ScoutGlyph } from "../components/ScoutGlyph";
 import { SectionLabel } from "../components/SectionLabel";
 import { Card } from "../styled";
 
@@ -39,8 +40,8 @@ export function SignIn({ onSignIn }: Props) {
       >
         <Box
           sx={{
-            width: 36,
-            height: 36,
+            width: 44,
+            height: 44,
             margin: "0 auto 10px",
             borderRadius: "50%",
             background: `${ACCENT}11`,
@@ -48,11 +49,9 @@ export function SignIn({ onSignIn }: Props) {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            fontSize: 16,
-            color: ACCENT,
           }}
         >
-          ◎
+          <ScoutGlyph size={26} />
         </Box>
         <Typography sx={{ fontSize: 12, color: TEXT, mb: 0.5, fontWeight: 500 }}>
           Link this extension to your Scout account

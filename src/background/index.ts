@@ -262,8 +262,11 @@ async function startOptimization(): Promise<{ ok: true } | { ok: false; error: s
     startedAt: new Date().toISOString(),
   };
   await saveJob(optimizing);
-  await chrome.action.setBadgeText({ text: "…" });
-  await chrome.action.setBadgeBackgroundColor({ color: "#1f2937" });
+  // Live status bar — design's "Live scraping" variant. Teal background, dark
+  // text. setBadgeTextColor lands in Chrome 110+; safe to call.
+  await chrome.action.setBadgeText({ text: "LIVE" });
+  await chrome.action.setBadgeBackgroundColor({ color: "#00d4aa" });
+  await chrome.action.setBadgeTextColor({ color: "#07090d" });
 
   // Schedule periodic polling. Also tick once immediately.
   await chrome.alarms.create(POLL_ALARM, { periodInMinutes: POLL_PERIOD_MIN });
@@ -297,8 +300,10 @@ async function pollOptimizationOnce(): Promise<void> {
     };
     await saveJob(completed);
     await chrome.alarms.clear(POLL_ALARM);
-    await chrome.action.setBadgeText({ text: "•" });
-    await chrome.action.setBadgeBackgroundColor({ color: "#00d4aa" });
+    // "AI insight ready" — design's sparkle glyph in amber.
+    await chrome.action.setBadgeText({ text: "✦" });
+    await chrome.action.setBadgeBackgroundColor({ color: "#f59e0b" });
+    await chrome.action.setBadgeTextColor({ color: "#1a1a20" });
   } else if (summary.status === "failed") {
     const failed: ActiveJob = {
       kind: "failed",
@@ -311,8 +316,10 @@ async function pollOptimizationOnce(): Promise<void> {
     };
     await saveJob(failed);
     await chrome.alarms.clear(POLL_ALARM);
+    // Urgent — design's danger red.
     await chrome.action.setBadgeText({ text: "!" });
-    await chrome.action.setBadgeBackgroundColor({ color: "#dc2626" });
+    await chrome.action.setBadgeBackgroundColor({ color: "#ef4444" });
+    await chrome.action.setBadgeTextColor({ color: "#ffffff" });
   }
   // else: still running — alarm will fire again
 }

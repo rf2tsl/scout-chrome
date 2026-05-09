@@ -11,6 +11,7 @@ import {
   HeaderTitle,
   PopupRoot,
 } from "../styled";
+import { ScoutGlyph } from "./ScoutGlyph";
 
 interface Props {
   children: ReactNode;
@@ -30,7 +31,9 @@ export function PopupShell({
   return (
     <PopupRoot>
       <Header>
-        <HeaderIcon>◎</HeaderIcon>
+        <HeaderIcon>
+          <ScoutGlyph size={18} />
+        </HeaderIcon>
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
             <HeaderTitle>Scout</HeaderTitle>

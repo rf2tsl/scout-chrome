@@ -31,7 +31,11 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
+      "matches": [
+        "https://patronly-pyrographic-amelie.ngrok-free.dev/extension-link*",
+        "https://scout-frontend.ngrok.app/extension-link*",
+        "http://localhost:3000/extension-link*"
+      ],
       "js": ["content.js"],
       "run_at": "document_idle"
     }
