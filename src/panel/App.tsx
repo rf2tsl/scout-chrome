@@ -3,18 +3,23 @@ import { isLinkedinProfileUrl } from "@/shared/linkedin";
 import { useAuth } from "./hooks/useAuth";
 import { useActiveJob } from "./hooks/useActiveJob";
 import { useActiveTab } from "./hooks/useActiveTab";
+import { usePanelTab } from "./hooks/usePanelTab";
+import { PanelShell } from "./components/PanelShell";
 import { LinkedinProfile } from "./views/LinkedinProfile";
+import { LinkedinHistory } from "./views/LinkedinHistory";
 import { Listing } from "./views/Listing";
 import { OptimizationResult } from "./views/OptimizationResult";
+import { ResumeHistory } from "./views/ResumeHistory";
 import { SignIn } from "./views/SignIn";
 import { ACCENT } from "./theme";
 
 export function App() {
   const auth = useAuth();
   const job = useActiveJob();
-  const { tab } = useActiveTab();
+  const { tab: activeTab } = useActiveTab();
+  const { tab, setTab, ready } = usePanelTab();
 
-  if (auth.state.kind === "unknown" || job.loading) {
+  if (auth.state.kind === "unknown" || job.loading || !ready) {
     return (
       <Box
         sx={{
@@ -33,27 +38,30 @@ export function App() {
     return <SignIn onSignIn={() => void auth.signIn()} />;
   }
 
-  // LinkedIn profile pages get a dedicated view ahead of the listing flow.
-  if (tab && isLinkedinProfileUrl(tab.url)) {
-    return <LinkedinProfile tab={tab} />;
-  }
-
-  // Optimization-stage states fall through to the result view.
-  if (
+  let content;
+  if (tab === "linkedin") {
+    content = <LinkedinHistory />;
+  } else if (tab === "resumes") {
+    content = <ResumeHistory />;
+  } else if (activeTab && isLinkedinProfileUrl(activeTab.url)) {
+    content = <LinkedinProfile tab={activeTab} />;
+  } else if (
     job.job &&
     (job.job.kind === "optimizing" ||
       job.job.kind === "completed" ||
       (job.job.kind === "failed" && job.job.phase === "optimize"))
   ) {
-    return <OptimizationResult job={job.job} onBack={() => void job.reset()} />;
+    content = <OptimizationResult job={job.job} onBack={() => void job.reset()} />;
+  } else {
+    content = (
+      <Listing
+        job={job.job}
+        reset={job.reset}
+        startCapture={job.startCapture}
+        startOptimize={job.startOptimize}
+      />
+    );
   }
 
-  return (
-    <Listing
-      job={job.job}
-      reset={job.reset}
-      startCapture={job.startCapture}
-      startOptimize={job.startOptimize}
-    />
-  );
+  return <PanelShell tab={tab} onTabChange={setTab}>{content}</PanelShell>;
 }
