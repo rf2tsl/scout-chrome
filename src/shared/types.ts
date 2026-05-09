@@ -97,3 +97,34 @@ export interface ProfileSuggestion {
   created_at: string;
   updated_at: string;
 }
+
+// Panel navigation -----------------------------------------------------------
+
+export type PanelTab = "home" | "linkedin" | "resumes";
+
+export interface ProfileSuggestionListItem {
+  id: number;
+  profile_url: string;
+  target_role: string;
+  status: ProfileSuggestionStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OptimizationListItem {
+  id: number;
+  job_context_kind: "saved_job" | "pasted" | "described";
+  job_context_title: string;
+  status: OptimizationStatus;
+  error_message: string;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export interface OptimizationDetail extends OptimizationListItem {
+  original_markdown: string;
+  optimized_markdown: string;
+  change_summary: string[];
+  recruiter_review: string;
+  job_context_text: string;
+}
