@@ -4,9 +4,27 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Scout</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
     <style>
-      html, body, #root { margin: 0; padding: 0; height: 100%; }
-      body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; background: #0e1116; color: #e6edf3; }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body {
+        width: 384px;
+        height: 560px;
+        background: #080c12;
+        color: #f3f4f6;
+        font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+        font-size: 13px;
+        overflow: hidden;
+      }
+      #root { height: 100%; }
+      ::-webkit-scrollbar { width: 4px; height: 4px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: #1f2937; border-radius: 2px; }
     </style>
   </head>
   <body>

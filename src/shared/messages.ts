@@ -31,6 +31,18 @@ export type ExtractPageResponse = {
   text: string;
 };
 
+// Job lifecycle ------------------------------------------------------------
+
+export type JobStartOptimizeRequest = {
+  kind: "JOB_START_OPTIMIZE";
+};
+export type JobStartOptimizeResponse =
+  | { ok: true }
+  | { ok: false; error: string };
+
+export type JobResetRequest = { kind: "JOB_RESET" };
+export type JobResetResponse = { ok: true };
+
 // Background → Panel broadcast (via chrome.runtime.sendMessage to all clients)
 
 export type AuthChangedEvent = { kind: "AUTH_CHANGED"; state: AuthState };

@@ -1,6 +1,5 @@
 import { useCallback, useState } from "react";
 import { apiFetch } from "@/shared/api";
-import type { ExtractPageResponse } from "@/shared/messages";
 import type { ExtractedListing } from "@/shared/types";
 
 type State =
@@ -9,6 +8,36 @@ type State =
   | { kind: "extracting" }
   | { kind: "done"; listing: ExtractedListing }
   | { kind: "error"; message: string };
+
+interface PageSnapshot {
+  url: string;
+  title: string;
+  text: string;
+}
+
+const MAX_TEXT_CHARS = 30_000;
+
+// Runs inside the target page (not the extension). Cannot reference module
+// scope — chrome.scripting serializes it.
+function snapshotPage(maxChars: number): PageSnapshot {
+  return {
+    url: location.href,
+    title: document.title,
+    text: (document.body?.innerText || "").slice(0, maxChars),
+  };
+}
+
+async function snapshotActiveTab(tabId: number): Promise<PageSnapshot> {
+  const [result] = await chrome.scripting.executeScript({
+    target: { tabId },
+    func: snapshotPage,
+    args: [MAX_TEXT_CHARS],
+  });
+  if (!result || typeof result.result !== "object" || result.result == null) {
+    throw new Error("page snapshot returned no result");
+  }
+  return result.result as PageSnapshot;
+}
 
 export function useListingExtract(): {
   state: State;
@@ -19,19 +48,15 @@ export function useListingExtract(): {
 
   const extract = useCallback(async (tabId: number) => {
     setState({ kind: "scraping" });
-    let scraped: ExtractPageResponse;
+    let snapshot: PageSnapshot;
     try {
-      const r = (await chrome.tabs.sendMessage(tabId, { kind: "EXTRACT_PAGE" })) as
-        | ExtractPageResponse
-        | undefined;
-      if (!r?.ok) throw new Error("page-text scrape failed");
-      scraped = r;
+      snapshot = await snapshotActiveTab(tabId);
     } catch (err) {
-      const message =
-        err instanceof Error
-          ? `${err.message}. The page may not allow content scripts (e.g. chrome:// or store pages).`
-          : "page-text scrape failed";
-      setState({ kind: "error", message });
+      const detail = err instanceof Error ? err.message : "page snapshot failed";
+      setState({
+        kind: "error",
+        message: `${detail}. Pages like chrome:// and the Web Store don't allow extension scripts.`,
+      });
       return;
     }
 
@@ -40,9 +65,9 @@ export function useListingExtract(): {
       const listing = await apiFetch<ExtractedListing>("/api/discover/extract-listing/", {
         method: "POST",
         body: JSON.stringify({
-          url: scraped.url,
-          page_title: scraped.title,
-          page_text: scraped.text,
+          url: snapshot.url,
+          page_title: snapshot.title,
+          page_text: snapshot.text,
         }),
       });
       setState({ kind: "done", listing });

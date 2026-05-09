@@ -1,73 +1,50 @@
-import { useState } from "react";
-import { Button, CircularProgress, Stack, Typography } from "@mui/material";
-import type { ExtractedListing } from "@/shared/types";
+import { Box, CircularProgress } from "@mui/material";
 import { useAuth } from "./hooks/useAuth";
-import { Body, Header, PanelRoot } from "./styled";
+import { useActiveJob } from "./hooks/useActiveJob";
 import { Listing } from "./views/Listing";
 import { OptimizationResult } from "./views/OptimizationResult";
 import { SignIn } from "./views/SignIn";
-
-type Route =
-  | { kind: "listing" }
-  | { kind: "optimization"; listing: ExtractedListing };
+import { ACCENT } from "./theme";
 
 export function App() {
-  const { state, signIn, signOut } = useAuth();
-  const [route, setRoute] = useState<Route>({ kind: "listing" });
+  const auth = useAuth();
+  const job = useActiveJob();
 
-  if (state.kind === "unknown") {
+  if (auth.state.kind === "unknown" || job.loading) {
     return (
-      <PanelRoot>
-        <PanelHeader signedIn={false} onSignOut={signOut} />
-        <Body>
-          <Stack alignItems="center" sx={{ mt: 6 }}>
-            <CircularProgress size={20} />
-          </Stack>
-        </Body>
-      </PanelRoot>
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          height: "100%",
+        }}
+      >
+        <CircularProgress size={20} sx={{ color: ACCENT }} />
+      </Box>
     );
   }
 
-  if (state.kind === "signed-out") {
-    return (
-      <PanelRoot>
-        <PanelHeader signedIn={false} onSignOut={signOut} />
-        <Body>
-          <SignIn onSignIn={() => void signIn()} />
-        </Body>
-      </PanelRoot>
-    );
+  if (auth.state.kind === "signed-out") {
+    return <SignIn onSignIn={() => void auth.signIn()} />;
+  }
+
+  // Optimization-stage states fall through to the result view.
+  if (
+    job.job &&
+    (job.job.kind === "optimizing" ||
+      job.job.kind === "completed" ||
+      (job.job.kind === "failed" && job.job.phase === "optimize"))
+  ) {
+    return <OptimizationResult job={job.job} onBack={() => void job.reset()} />;
   }
 
   return (
-    <PanelRoot>
-      <PanelHeader signedIn onSignOut={signOut} />
-      <Body>
-        {route.kind === "listing" && (
-          <Listing onOptimize={(listing) => setRoute({ kind: "optimization", listing })} />
-        )}
-        {route.kind === "optimization" && (
-          <OptimizationResult
-            listing={route.listing}
-            onBack={() => setRoute({ kind: "listing" })}
-          />
-        )}
-      </Body>
-    </PanelRoot>
-  );
-}
-
-function PanelHeader({ signedIn, onSignOut }: { signedIn: boolean; onSignOut: () => void }) {
-  return (
-    <Header>
-      <Typography variant="subtitle1" sx={{ fontWeight: 700, letterSpacing: 0.5 }}>
-        SCOUT
-      </Typography>
-      {signedIn && (
-        <Button size="small" onClick={() => void onSignOut()}>
-          Sign out
-        </Button>
-      )}
-    </Header>
+    <Listing
+      job={job.job}
+      reset={job.reset}
+      startCapture={job.startCapture}
+      startOptimize={job.startOptimize}
+    />
   );
 }

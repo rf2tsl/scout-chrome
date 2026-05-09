@@ -1,149 +1,222 @@
-import { useEffect, useMemo } from "react";
-import {
-  Alert,
-  Box,
-  Button,
-  CircularProgress,
-  Divider,
-  Stack,
-  Typography,
-} from "@mui/material";
+import { useCallback, useMemo } from "react";
+import { Alert, Box, Button, Stack, Typography } from "@mui/material";
 import DOMPurify from "isomorphic-dompurify";
 import { marked } from "marked";
-import type { ExtractedListing } from "@/shared/types";
-import { useOptimization } from "../hooks/useOptimization";
-import { AccentCard } from "../styled";
+import { apiFetchBlob } from "@/shared/api";
+import type { ActiveJob } from "@/shared/jobStore";
+import { PopupShell } from "../components/PopupShell";
+import { DetectedJobCard } from "../components/DetectedJobCard";
+import { SectionLabel } from "../components/SectionLabel";
+import { ACCENT, BORDER, DIM, FAINT, MUTED, SURFACE, TEXT } from "../theme";
+import { Card, PaddedCard, SpinnerRing } from "../styled";
 
 interface Props {
-  listing: ExtractedListing;
+  job: Extract<ActiveJob, { kind: "optimizing" | "completed" | "failed" }>;
   onBack: () => void;
 }
 
-export function OptimizationResult({ listing, onBack }: Props) {
-  const { state, create, download, reset } = useOptimization();
+export function OptimizationResult({ job, onBack }: Props) {
+  const subtitle = [job.listing?.company, job.listing?.location].filter(Boolean).join(" · ");
 
-  // Kick off the run as soon as the view mounts.
-  useEffect(() => {
-    const title = listing.company
-      ? `${listing.title || "Role"} at ${listing.company}`
-      : listing.title || "Pasted listing";
-    const text = [
-      listing.title && `Title: ${listing.title}`,
-      listing.company && `Company: ${listing.company}`,
-      listing.location && `Location: ${listing.location}`,
-      "",
-      listing.description_markdown,
-    ]
-      .filter(Boolean)
-      .join("\n");
-    void create({ jobContextTitle: title, jobContextText: text });
-    return () => reset();
-    // intentionally only on first mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const download = useCallback(
+    async (format: "pdf" | "docx") => {
+      try {
+        const { blob, filename } = await apiFetchBlob(
+          `/api/resume/optimizations/${job.optimizationId}/download/?file_format=${format}`,
+        );
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename || `resume.${format}`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        // eslint-disable-next-line no-alert
+        alert(`Download failed: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    },
+    [job.optimizationId],
+  );
 
-  return (
-    <Stack spacing={2}>
-      <Stack direction="row" justifyContent="space-between" alignItems="center">
-        <Typography variant="overline" color="text.secondary">
-          Optimization
-        </Typography>
-        <Button size="small" onClick={onBack}>
-          ← Back
+  const footer = (() => {
+    if (job.kind === "optimizing") {
+      return (
+        <Button
+          variant="contained"
+          fullWidth
+          disabled
+          sx={{
+            background: "#1f2937",
+            color: FAINT,
+            "&.Mui-disabled": { background: "#1f2937", color: FAINT },
+          }}
+        >
+          Analyzing… (you can close this popup)
+        </Button>
+      );
+    }
+    if (job.kind === "failed") {
+      return (
+        <Button variant="outlined" fullWidth onClick={onBack}>
+          Try a different listing
+        </Button>
+      );
+    }
+    return (
+      <Stack direction="row" spacing={0.75}>
+        <Button
+          variant="contained"
+          onClick={() => void download("pdf")}
+          sx={{
+            flex: 1,
+            background: ACCENT,
+            color: "#0a0e14",
+            fontSize: 12,
+            "&:hover": { background: ACCENT, opacity: 0.9 },
+          }}
+        >
+          ↓ PDF
+        </Button>
+        <Button
+          onClick={() => void download("docx")}
+          sx={{
+            padding: "9px 12px",
+            border: `1px solid ${BORDER}`,
+            color: DIM,
+            fontSize: 12,
+          }}
+        >
+          DOCX
+        </Button>
+        <Button
+          onClick={onBack}
+          sx={{
+            padding: "9px 12px",
+            border: `1px solid ${BORDER}`,
+            color: DIM,
+            fontSize: 12,
+          }}
+        >
+          New
         </Button>
       </Stack>
+    );
+  })();
 
-      {state.kind === "running" && (
-        <AccentCard>
-          <Stack direction="row" alignItems="center" spacing={1.5}>
-            <CircularProgress size={18} />
-            <Typography variant="body2" color="text.secondary">
-              Tailoring your resume to this listing...
+  return (
+    <PopupShell footer={footer}>
+      <DetectedJobCard
+        title={job.listing?.title || ""}
+        subtitle={subtitle}
+        source={job.hostname}
+      />
+
+      {job.kind === "optimizing" && (
+        <PaddedCard
+          sx={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            alignItems: "center",
+            gap: 2,
+            minHeight: 260,
+          }}
+        >
+          <SpinnerRing>
+            <Box className="ring-bg" />
+            <Box className="ring-fg" />
+            <Box className="ring-glyph">✦</Box>
+          </SpinnerRing>
+          <Box sx={{ textAlign: "center" }}>
+            <Typography sx={{ fontSize: 13, color: TEXT, fontWeight: 500, mb: 0.5 }}>
+              Optimizing{job.listing?.company ? ` for ${job.listing?.company}` : ""}
             </Typography>
-          </Stack>
-        </AccentCard>
+            <Typography sx={{ fontSize: 11, color: MUTED }}>
+              You can close this popup — we&apos;ll keep working in the background.
+            </Typography>
+          </Box>
+        </PaddedCard>
       )}
 
-      {state.kind === "error" && (
-        <Alert severity="error">
-          {state.message}
-          <Box sx={{ mt: 1 }}>
-            <Button size="small" variant="outlined" onClick={onBack}>
-              Go back
-            </Button>
-          </Box>
+      {job.kind === "failed" && (
+        <Alert severity="error" sx={{ background: SURFACE }}>
+          {job.message}
         </Alert>
       )}
 
-      {state.kind === "done" && (
+      {job.kind === "completed" && (
         <DoneView
-          opt={state.opt}
-          onDownloadPdf={() => void download("pdf")}
-          onDownloadDocx={() => void download("docx")}
+          changeSummary={job.summary.changeSummary}
+          recruiterReview={job.summary.recruiterReview}
         />
       )}
-    </Stack>
+    </PopupShell>
   );
 }
 
 function DoneView({
-  opt,
-  onDownloadPdf,
-  onDownloadDocx,
+  changeSummary,
+  recruiterReview,
 }: {
-  opt: { changeSummary: string[]; recruiterReview: string };
-  onDownloadPdf: () => void;
-  onDownloadDocx: () => void;
+  changeSummary: string[];
+  recruiterReview: string;
 }) {
   const reviewHtml = useMemo(() => {
-    const raw = opt.recruiterReview || "";
+    const raw = recruiterReview || "";
     if (!raw.trim()) return "";
     return DOMPurify.sanitize(marked.parse(raw, { async: false }) as string);
-  }, [opt.recruiterReview]);
+  }, [recruiterReview]);
 
   return (
-    <Stack spacing={2}>
-      <Stack direction="row" spacing={1}>
-        <Button variant="contained" onClick={onDownloadPdf} fullWidth>
-          Download PDF
-        </Button>
-        <Button variant="outlined" onClick={onDownloadDocx} fullWidth>
-          DOCX
-        </Button>
-      </Stack>
-
-      {opt.changeSummary.length > 0 && (
-        <AccentCard>
-          <Typography variant="overline" color="text.secondary">
-            What changed
-          </Typography>
-          <Box component="ul" sx={{ paddingLeft: 2.5, margin: 0, mt: 1 }}>
-            {opt.changeSummary.map((line, i) => (
-              <li key={i}>
-                <Typography variant="body2">{line}</Typography>
-              </li>
-            ))}
-          </Box>
-        </AccentCard>
+    <>
+      {changeSummary.length > 0 && (
+        <>
+          <SectionLabel hint={`${changeSummary.length} edits`}>What changed</SectionLabel>
+          <Card>
+            <Stack spacing={0.75}>
+              {changeSummary.map((line, i) => (
+                <Stack key={i} direction="row" spacing={1} alignItems="flex-start">
+                  <Box sx={{ color: ACCENT, fontSize: 11, lineHeight: 1.55, flexShrink: 0 }}>+</Box>
+                  <Typography sx={{ fontSize: 11, color: DIM, lineHeight: 1.55 }}>
+                    {line}
+                  </Typography>
+                </Stack>
+              ))}
+            </Stack>
+          </Card>
+        </>
       )}
 
       {reviewHtml && (
-        <AccentCard>
-          <Typography variant="overline" color="text.secondary">
-            10-second recruiter review
-          </Typography>
-          <Divider sx={{ my: 1 }} />
-          <Box
-            sx={{
-              "& p": { margin: "6px 0" },
-              "& ol, & ul": { paddingLeft: 2.5, margin: "6px 0" },
-              fontSize: 13,
-              lineHeight: 1.6,
-            }}
-            dangerouslySetInnerHTML={{ __html: reviewHtml }}
-          />
-        </AccentCard>
+        <>
+          <SectionLabel>10-second recruiter review</SectionLabel>
+          <Card>
+            <Box
+              sx={{
+                fontSize: 11,
+                lineHeight: 1.55,
+                color: DIM,
+                "& p": { margin: "5px 0" },
+                "& ol, & ul": { paddingLeft: 2.5, margin: "5px 0" },
+                "& strong": { color: TEXT, fontWeight: 600 },
+                "& em": { color: ACCENT, fontStyle: "normal" },
+              }}
+              dangerouslySetInnerHTML={{ __html: reviewHtml }}
+            />
+          </Card>
+        </>
       )}
-    </Stack>
+
+      {!changeSummary.length && !reviewHtml && (
+        <Card>
+          <Typography sx={{ fontSize: 12, color: FAINT, textAlign: "center", py: 2 }}>
+            No edits returned. Try a different listing.
+          </Typography>
+        </Card>
+      )}
+    </>
   );
 }
