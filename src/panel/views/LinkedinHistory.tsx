@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Alert, Box, CircularProgress, IconButton, Stack, Tab, Tabs, Typography } from "@mui/material";
 import { apiFetch } from "@/shared/api";
+import { toUserMessage } from "@/shared/userError";
 import type { ProfileSuggestion } from "@/shared/types";
 import { ChecklistTab } from "../components/LinkedinProfile/ChecklistTab";
 import { SuggestionsTab } from "../components/LinkedinProfile/SuggestionsTab";
@@ -100,7 +101,7 @@ function DetailView({ id, onBack }: { id: number; onBack: () => void }) {
       const r = await apiFetch<ProfileSuggestion>(`/api/linkedin/profile-suggestions/${id}/`);
       setData(r);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "failed to load");
+      setError(toUserMessage(err));
     }
   }, [id]);
 

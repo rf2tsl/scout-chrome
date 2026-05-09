@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { ApiError, apiFetch } from "@/shared/api";
+import { toUserMessage } from "@/shared/userError";
 import type { ProfileSuggestion } from "@/shared/types";
 
 const TARGET_ROLE_KEY = "scout:linkedin:target-role";
@@ -81,8 +82,7 @@ export function useLinkedinProfile(profileUrl: string): {
           setState({ kind: "idle" });
           return;
         }
-        const message = err instanceof Error ? err.message : "failed to load suggestions";
-        setState({ kind: "error", message });
+        setState({ kind: "error", message: toUserMessage(err) });
       });
     return () => {
       cancelled = true;
@@ -100,11 +100,10 @@ export function useLinkedinProfile(profileUrl: string): {
       let snapshot: PageSnapshot;
       try {
         snapshot = await snapshotActiveTab(tabId);
-      } catch (err) {
-        const detail = err instanceof Error ? err.message : "page snapshot failed";
+      } catch {
         setState({
           kind: "error",
-          message: `${detail}. Reload the LinkedIn page and try again.`,
+          message: "Couldn't read the LinkedIn page. Reload it and try again.",
         });
         return;
       }
@@ -128,8 +127,7 @@ export function useLinkedinProfile(profileUrl: string): {
         );
         setState({ kind: "done", suggestion });
       } catch (err) {
-        const message = err instanceof Error ? err.message : "analysis failed";
-        setState({ kind: "error", message });
+        setState({ kind: "error", message: toUserMessage(err) });
       }
     },
     [profileUrl, targetRole],

@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Alert, Box, CircularProgress, IconButton, Stack, Typography } from "@mui/material";
 import { apiFetch } from "@/shared/api";
+import { toUserMessage } from "@/shared/userError";
 import type { OptimizationDetail } from "@/shared/types";
 import { OptimizationResultView } from "../components/OptimizationResultView";
 import { ViewRoot } from "../components/LinkedinProfile/styled";
@@ -98,7 +99,7 @@ function DetailView({ id, onBack }: { id: number; onBack: () => void }) {
       const r = await apiFetch<OptimizationDetail>(`/api/resume/optimizations/${id}/`);
       setData(r);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "failed to load");
+      setError(toUserMessage(err));
     }
   }, [id]);
 

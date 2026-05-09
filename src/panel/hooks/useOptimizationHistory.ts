@@ -1,6 +1,7 @@
 // scout-chrome/src/panel/hooks/useOptimizationHistory.ts
 import { useCallback, useEffect, useState } from "react";
 import { apiFetch } from "@/shared/api";
+import { toUserMessage } from "@/shared/userError";
 import type { OptimizationListItem } from "@/shared/types";
 
 export type HistoryState =
@@ -23,8 +24,7 @@ export function useOptimizationHistory(): {
       );
       setState({ kind: "ready", items });
     } catch (err) {
-      const message = err instanceof Error ? err.message : "failed to load";
-      setState({ kind: "error", message });
+      setState({ kind: "error", message: toUserMessage(err) });
     }
   }, []);
 

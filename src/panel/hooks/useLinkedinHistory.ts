@@ -1,6 +1,7 @@
 // scout-chrome/src/panel/hooks/useLinkedinHistory.ts
 import { useCallback, useEffect, useState } from "react";
 import { apiFetch } from "@/shared/api";
+import { toUserMessage } from "@/shared/userError";
 import type { ProfileSuggestionListItem } from "@/shared/types";
 
 interface PaginatedResponse {
@@ -30,8 +31,7 @@ export function useLinkedinHistory(): {
       );
       setState({ kind: "ready", items: r.results });
     } catch (err) {
-      const message = err instanceof Error ? err.message : "failed to load";
-      setState({ kind: "error", message });
+      setState({ kind: "error", message: toUserMessage(err) });
     }
   }, []);
 
