@@ -61,7 +61,8 @@ export const SuggestionText = styled("pre")({
 export const SmallButton = styled(Button)({
   fontSize: 11,
   padding: "4px 8px",
-  minWidth: 0,
+  minWidth: 110,
+  flexShrink: 0,
   background: ACCENT,
   color: "#0a0e14",
   textTransform: "none",
