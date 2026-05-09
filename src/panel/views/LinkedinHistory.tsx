@@ -34,6 +34,10 @@ export function LinkedinHistory() {
     return <DetailView id={openId} onBack={() => setOpenId(null)} />;
   }
 
+  const visibleItems = state.kind === "ready"
+    ? state.items.filter((x) => x.status !== "error")
+    : [];
+
   return (
     <ViewRoot>
       <Typography sx={{ fontSize: 14, color: TEXT, fontWeight: 600 }}>
@@ -53,13 +57,13 @@ export function LinkedinHistory() {
         </Alert>
       )}
 
-      {state.kind === "ready" && state.items.length === 0 && (
+      {state.kind === "ready" && visibleItems.length === 0 && (
         <EmptyMessage>No scans yet. Scan a LinkedIn profile from the Home tab.</EmptyMessage>
       )}
 
-      {state.kind === "ready" && state.items.length > 0 && (
+      {state.kind === "ready" && visibleItems.length > 0 && (
         <ListRoot>
-          {state.items.map((item) => (
+          {visibleItems.map((item) => (
             <HistoryListRow
               key={item.id}
               data={{
@@ -67,11 +71,9 @@ export function LinkedinHistory() {
                 title: profileSlug(item.profile_url),
                 subtitle: item.target_role,
                 badge:
-                  item.status === "error"
-                    ? { text: "error", tone: "error" }
-                    : item.status === "pending"
-                      ? { text: "pending", tone: "warn" }
-                      : undefined,
+                  item.status === "pending"
+                    ? { text: "pending", tone: "warn" }
+                    : undefined,
                 dateLabel: relativeDate(item.created_at),
               }}
               onOpen={(id) => setOpenId(id)}

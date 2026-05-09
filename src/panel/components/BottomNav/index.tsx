@@ -9,7 +9,7 @@ interface Props {
 
 const TABS: ReadonlyArray<{ key: PanelTab; glyph: string; label: string }> = [
   { key: "home", glyph: "✦", label: "Home" },
-  { key: "linkedin", glyph: "in", label: "LinkedIn" },
+  { key: "linkedin", glyph: "👤", label: "LinkedIn" },
   { key: "resumes", glyph: "▤", label: "Resumes" },
 ];
 
