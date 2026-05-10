@@ -128,3 +128,48 @@ export interface OptimizationDetail extends OptimizationListItem {
   recruiter_review: string;
   job_context_text: string;
 }
+
+// Autofill -----------------------------------------------------------------
+
+export type FieldKind =
+  | "text"
+  | "textarea"
+  | "select"
+  | "multiselect"
+  | "yesno"
+  | "checkbox";
+
+export interface FieldSpec {
+  id: string;
+  label: string;
+  kind: FieldKind;
+  required: boolean;
+  options?: string[];
+  hint?: string;
+}
+
+export type FieldValue = string | string[] | boolean;
+
+export interface ApplicantProfile {
+  firstName: string;
+  lastName: string;
+  phone: string;
+  linkedinUrl: string;
+  portfolioUrl: string;
+  locationCity: string;
+  locationCountry: string;
+  authorizedToWorkUs: boolean | null;
+  requiresSponsorship: boolean | null;
+  eeocGender: string;
+  eeocRace: string;
+  eeocVeteranStatus: string;
+  eeocDisabilityStatus: string;
+}
+
+export interface AutofillResponse {
+  values: Record<string, FieldValue>;
+  matched: Record<string, keyof ApplicantProfile | "email" | "full_name">;
+  aiDrafted: string[];
+  unmatched: string[];
+  profile: ApplicantProfile;
+}

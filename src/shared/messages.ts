@@ -1,6 +1,6 @@
 // Typed protocol for chrome.runtime.sendMessage between panel ↔ background ↔ content.
 
-import type { AuthState } from "./types";
+import type { AuthState, FieldSpec, FieldValue } from "./types";
 
 // Panel ↔ Background --------------------------------------------------------
 
@@ -43,6 +43,26 @@ export type JobStartOptimizeResponse =
 export type JobResetRequest = { kind: "JOB_RESET" };
 export type JobResetResponse = { ok: true };
 
+// Panel → Background — request injection of the autofill content script.
+export type InjectAutofillRequest = { kind: "INJECT_AUTOFILL"; tabId: number };
+export type InjectAutofillResponse =
+  | { ok: true }
+  | { ok: false; error: string };
+
+// Panel → Content (autofill module).
+export type ScanFormRequest = { kind: "SCAN_FORM" };
+export type ScanFormResponse =
+  | { ok: true; fields: FieldSpec[] }
+  | { ok: false; error: string };
+
+export type FillFormRequest = {
+  kind: "FILL_FORM";
+  values: Record<string, FieldValue>;
+};
+export type FillFormResponse =
+  | { ok: true; filled: number; failed: string[] }
+  | { ok: false; error: string };
+
 // Background → Panel broadcast (via chrome.runtime.sendMessage to all clients)
 
 export type AuthChangedEvent = { kind: "AUTH_CHANGED"; state: AuthState };
@@ -53,8 +73,11 @@ export type PanelToBackground =
   | GetAuthStateRequest
   | SignOutRequest
   | OpenSignInRequest
-  | GetActiveTabRequest;
+  | GetActiveTabRequest
+  | InjectAutofillRequest;
 
 export type BackgroundToPanel = AuthChangedEvent;
 
 export type AnyToContent = ExtractPageRequest;
+
+export type AnyToContentAutofill = ScanFormRequest | FillFormRequest;
