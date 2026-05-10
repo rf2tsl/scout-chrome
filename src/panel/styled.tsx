@@ -6,15 +6,20 @@ import {
   FAINT,
   FOOTER_BG,
   MUTED,
-  POPUP_H,
   SURFACE,
   TEXT,
 } from "./theme";
 
 // ─── Shell layout ────────────────────────────────────────────────────────
 
+// Fills its container (the side panel mount point or the PanelShell scroll
+// area). Header + Footer hold their natural height; Body is the flexible
+// scroll region in between. Fixed-height variants would shove the footer
+// behind the bottom nav when the side panel is taller or shorter than the
+// legacy 560px popup window.
 export const PopupRoot = styled(Box)({
-  height: POPUP_H,
+  height: "100%",
+  minHeight: 0,
   background: "transparent",
   color: TEXT,
   display: "flex",

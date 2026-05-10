@@ -13,9 +13,6 @@ export const DIM        = "#9ca3af";
 export const MUTED      = "#6b7280";
 export const FAINT      = "#4b5563";
 
-export const POPUP_W = 384;
-export const POPUP_H = 560;
-
 const FONT_STACK =
   "'Space Grotesk', -apple-system, BlinkMacSystemFont, system-ui, sans-serif";
 
