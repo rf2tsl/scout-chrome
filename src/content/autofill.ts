@@ -9,6 +9,10 @@
 // listener. Runs in the page world; cannot reference @/ aliases (the script
 // is bundled as IIFE before injection).
 
+// Idempotent install guard — each Scan triggers a fresh injection.
+// Cast to any to attach a flag without a global augmentation (this file has no imports).
+type ScoutWindow = Window & { __scoutAutofillInstalled?: boolean };
+
 interface FieldSpec {
   id: string;
   label: string;
@@ -316,20 +320,23 @@ function fillForm(values: Record<string, FieldValue>): { filled: number; failed:
 
 // ─── Message router ──────────────────────────────────────────────────────
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  try {
-    if (message?.kind === "SCAN_FORM") {
-      sendResponse({ ok: true, fields: scanForm() });
+if (!(window as ScoutWindow).__scoutAutofillInstalled) {
+  (window as ScoutWindow).__scoutAutofillInstalled = true;
+  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    try {
+      if (message?.kind === "SCAN_FORM") {
+        sendResponse({ ok: true, fields: scanForm() });
+        return false;
+      }
+      if (message?.kind === "FILL_FORM") {
+        const result = fillForm(message.values || {});
+        sendResponse({ ok: true, ...result });
+        return false;
+      }
+    } catch (err) {
+      sendResponse({ ok: false, error: err instanceof Error ? err.message : "error" });
       return false;
     }
-    if (message?.kind === "FILL_FORM") {
-      const result = fillForm(message.values || {});
-      sendResponse({ ok: true, ...result });
-      return false;
-    }
-  } catch (err) {
-    sendResponse({ ok: false, error: err instanceof Error ? err.message : "error" });
     return false;
-  }
-  return false;
-});
+  });
+}

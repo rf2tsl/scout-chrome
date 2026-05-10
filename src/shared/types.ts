@@ -166,9 +166,15 @@ export interface ApplicantProfile {
   eeocDisabilityStatus: string;
 }
 
+export type ProfileAttrName =
+  | "first_name" | "last_name" | "full_name" | "email" | "phone"
+  | "linkedin_url" | "portfolio_url" | "location_city" | "location_country"
+  | "authorized_to_work_us" | "requires_sponsorship"
+  | "eeoc_gender" | "eeoc_race" | "eeoc_veteran_status" | "eeoc_disability_status";
+
 export interface AutofillResponse {
   values: Record<string, FieldValue>;
-  matched: Record<string, keyof ApplicantProfile | "email" | "full_name">;
+  matched: Record<string, ProfileAttrName>; // field_id -> profile attribute (snake_case)
   aiDrafted: string[];
   unmatched: string[];
   profile: ApplicantProfile;

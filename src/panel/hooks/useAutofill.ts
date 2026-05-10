@@ -6,6 +6,7 @@ import type {
   AutofillResponse,
   FieldSpec,
   FieldValue,
+  ProfileAttrName,
 } from "@/shared/types";
 import type {
   FillFormRequest,
@@ -16,20 +17,52 @@ import type {
   ScanFormResponse,
 } from "@/shared/messages";
 
-// camelCase the response. snake_case <-> camelCase is the convention used
-// by the panel (see useOptimization.ts).
-function camelize<T = unknown>(input: unknown): T {
-  if (Array.isArray(input)) return input.map((v) => camelize(v)) as unknown as T;
-  if (input && typeof input === "object") {
-    const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(input)) {
-      const ck = k.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
-      out[ck] = camelize(v);
-    }
-    return out as T;
-  }
-  return input as T;
+function camelizeProfile(p: Record<string, unknown>): ApplicantProfile {
+  return {
+    firstName: String(p.first_name ?? ""),
+    lastName: String(p.last_name ?? ""),
+    phone: String(p.phone ?? ""),
+    linkedinUrl: String(p.linkedin_url ?? ""),
+    portfolioUrl: String(p.portfolio_url ?? ""),
+    locationCity: String(p.location_city ?? ""),
+    locationCountry: String(p.location_country ?? ""),
+    authorizedToWorkUs: p.authorized_to_work_us as boolean | null,
+    requiresSponsorship: p.requires_sponsorship as boolean | null,
+    eeocGender: String(p.eeoc_gender ?? ""),
+    eeocRace: String(p.eeoc_race ?? ""),
+    eeocVeteranStatus: String(p.eeoc_veteran_status ?? ""),
+    eeocDisabilityStatus: String(p.eeoc_disability_status ?? ""),
+  };
 }
+
+function decodeAutofillResponse(raw: unknown): AutofillResponse {
+  const r = raw as Record<string, unknown>;
+  return {
+    values: (r.values as Record<string, FieldValue>) ?? {},
+    matched: (r.matched as AutofillResponse["matched"]) ?? {},
+    aiDrafted: (r.ai_drafted as string[]) ?? [],
+    unmatched: (r.unmatched as string[]) ?? [],
+    profile: camelizeProfile((r.profile as Record<string, unknown>) ?? {}),
+  };
+}
+
+const PROFILE_ATTR_TO_KEY: Record<ProfileAttrName, keyof ApplicantProfile | null> = {
+  first_name: "firstName",
+  last_name: "lastName",
+  full_name: null, // composite — no single profile field
+  email: null,     // user.email, not on profile
+  phone: "phone",
+  linkedin_url: "linkedinUrl",
+  portfolio_url: "portfolioUrl",
+  location_city: "locationCity",
+  location_country: "locationCountry",
+  authorized_to_work_us: "authorizedToWorkUs",
+  requires_sponsorship: "requiresSponsorship",
+  eeoc_gender: "eeocGender",
+  eeoc_race: "eeocRace",
+  eeoc_veteran_status: "eeocVeteranStatus",
+  eeoc_disability_status: "eeocDisabilityStatus",
+};
 
 function decamelize<T extends Record<string, unknown>>(o: T): Record<string, unknown> {
   const out: Record<string, unknown> = {};
@@ -115,7 +148,7 @@ export function useAutofill(): UseAutofill {
           schema: scanRes.fields,
         }),
       });
-      response = camelize<AutofillResponse>(raw);
+      response = decodeAutofillResponse(raw);
     } catch (err) {
       const msg =
         err instanceof ApiError && err.status === 400
@@ -154,7 +187,8 @@ export function useAutofill(): UseAutofill {
         // unless the user has manually edited that field.
         const values = { ...prev.values };
         for (const [fieldId, attr] of Object.entries(prev.response.matched)) {
-          if (attr !== key) continue;
+          const profileKey = PROFILE_ATTR_TO_KEY[attr];
+          if (profileKey !== key) continue;
           if (prev.manuallyEdited.has(fieldId)) continue;
           values[fieldId] = String(value ?? "");
         }

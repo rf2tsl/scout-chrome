@@ -1,4 +1,4 @@
-import { Chip, Stack, TextField, Typography } from "@mui/material";
+import { Chip, MenuItem, Select, Stack, TextField, Typography } from "@mui/material";
 import type { FieldSpec, FieldValue } from "@/shared/types";
 import { ACCENT, FAINT, MUTED, TEXT } from "../../theme";
 import { FieldRowOuter } from "./styled";
@@ -55,6 +55,29 @@ export function FieldRow({ field, value, status, onChange }: Props) {
         <Typography sx={{ fontSize: 10, color: MUTED }}>
           {value ? "Will be checked" : "Will not be checked"}
         </Typography>
+      ) : (field.kind === "select" || field.kind === "yesno" || field.kind === "multiselect") &&
+        field.options &&
+        field.options.length > 0 ? (
+        <Select
+          size="small"
+          multiple={field.kind === "multiselect"}
+          value={
+            field.kind === "multiselect"
+              ? Array.isArray(value)
+                ? (value as string[])
+                : []
+              : (value as string) ?? ""
+          }
+          onChange={(e) => onChange(e.target.value as FieldValue)}
+          error={required}
+          sx={{ fontSize: 12, color: TEXT }}
+        >
+          {field.options.map((opt) => (
+            <MenuItem key={opt} value={opt} sx={{ fontSize: 12 }}>
+              {opt}
+            </MenuItem>
+          ))}
+        </Select>
       ) : (
         <TextField
           size="small"
@@ -63,11 +86,6 @@ export function FieldRow({ field, value, status, onChange }: Props) {
           error={required}
           inputProps={{ style: { fontSize: 12, color: TEXT } }}
         />
-      )}
-      {field.options && field.options.length > 0 && (
-        <Typography sx={{ fontSize: 9, color: FAINT, mt: 0.25 }}>
-          options: {field.options.join(" / ")}
-        </Typography>
       )}
     </FieldRowOuter>
   );

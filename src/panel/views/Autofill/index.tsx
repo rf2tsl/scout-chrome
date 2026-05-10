@@ -44,25 +44,15 @@ export function Autofill({ initialOptimizationId, onClose }: Props) {
     );
   }
 
-  if (state.kind === "reviewing" || state.kind === "filling") {
-    const reviewing = state.kind === "reviewing" ? state : null;
-    if (!reviewing) {
-      return (
-        <PopupShell footer={null}>
-          <Stack alignItems="center" sx={{ py: 4 }}>
-            <Typography sx={{ fontSize: 12, color: TEXT }}>Filling…</Typography>
-          </Stack>
-        </PopupShell>
-      );
-    }
+  if (state.kind === "reviewing") {
     return (
       <PopupShell footer={null}>
         <ReviewStep
-          schema={reviewing.schema}
-          response={reviewing.response}
-          values={reviewing.values}
-          profile={reviewing.profile}
-          saveProfile={reviewing.saveProfile}
+          schema={state.schema}
+          response={state.response}
+          values={state.values}
+          profile={state.profile}
+          saveProfile={state.saveProfile}
           filling={false}
           onValueChange={setValue}
           onProfileChange={setProfileField}
@@ -70,6 +60,16 @@ export function Autofill({ initialOptimizationId, onClose }: Props) {
           onFill={() => void fill(tab.tabId)}
           onCancel={close}
         />
+      </PopupShell>
+    );
+  }
+
+  if (state.kind === "filling") {
+    return (
+      <PopupShell footer={null}>
+        <Stack alignItems="center" sx={{ py: 4 }}>
+          <Typography sx={{ fontSize: 12, color: TEXT }}>Filling…</Typography>
+        </Stack>
       </PopupShell>
     );
   }
