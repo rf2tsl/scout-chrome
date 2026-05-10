@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Box, CircularProgress } from "@mui/material";
 import { isLinkedinProfileUrl } from "@/shared/linkedin";
 import { useAuth } from "./hooks/useAuth";
@@ -11,6 +12,7 @@ import { Listing } from "./views/Listing";
 import { OptimizationResult } from "./views/OptimizationResult";
 import { ResumeHistory } from "./views/ResumeHistory";
 import { SignIn } from "./views/SignIn";
+import { Autofill } from "./views/Autofill";
 import { ACCENT } from "./theme";
 
 export function App() {
@@ -18,6 +20,8 @@ export function App() {
   const job = useActiveJob();
   const { tab: activeTab } = useActiveTab();
   const { tab, setTab, ready } = usePanelTab();
+  const [autofillOptId, setAutofillOptId] = useState<number | null>(null);
+  const [autofillOpen, setAutofillOpen] = useState(false);
 
   if (auth.state.kind === "unknown" || job.loading || !ready) {
     return (
@@ -38,6 +42,17 @@ export function App() {
     return <SignIn onSignIn={() => void auth.signIn()} />;
   }
 
+  if (autofillOpen) {
+    return (
+      <PanelShell tab={tab} onTabChange={setTab}>
+        <Autofill
+          initialOptimizationId={autofillOptId}
+          onClose={() => { setAutofillOpen(false); setAutofillOptId(null); }}
+        />
+      </PanelShell>
+    );
+  }
+
   let content;
   if (tab === "linkedin") {
     content = <LinkedinHistory />;
@@ -51,7 +66,13 @@ export function App() {
       job.job.kind === "completed" ||
       (job.job.kind === "failed" && job.job.phase === "optimize"))
   ) {
-    content = <OptimizationResult job={job.job} onBack={() => void job.reset()} />;
+    content = (
+      <OptimizationResult
+        job={job.job}
+        onBack={() => void job.reset()}
+        onUseToAutofill={(id: number) => { setAutofillOpen(true); setAutofillOptId(id); }}
+      />
+    );
   } else {
     content = (
       <Listing
@@ -59,6 +80,7 @@ export function App() {
         reset={job.reset}
         startCapture={job.startCapture}
         startOptimize={job.startOptimize}
+        onOpenAutofill={() => { setAutofillOpen(true); setAutofillOptId(null); }}
       />
     );
   }

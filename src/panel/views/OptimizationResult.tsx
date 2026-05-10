@@ -11,9 +11,10 @@ import { PaddedCard, SpinnerRing } from "../styled";
 interface Props {
   job: Extract<ActiveJob, { kind: "optimizing" | "completed" | "failed" }>;
   onBack: () => void;
+  onUseToAutofill: (optimizationId: number) => void;
 }
 
-export function OptimizationResult({ job, onBack }: Props) {
+export function OptimizationResult({ job, onBack, onUseToAutofill }: Props) {
   const subtitle = [job.listing?.company, job.listing?.location].filter(Boolean).join(" · ");
 
   const download = useCallback(
@@ -87,6 +88,13 @@ export function OptimizationResult({ job, onBack }: Props) {
           }}
         >
           DOCX
+        </Button>
+        <Button
+          variant="outlined"
+          onClick={() => onUseToAutofill(job.optimizationId as number)}
+          sx={{ borderColor: ACCENT, color: ACCENT, fontSize: 12 }}
+        >
+          Use to autofill
         </Button>
         <Button
           onClick={onBack}

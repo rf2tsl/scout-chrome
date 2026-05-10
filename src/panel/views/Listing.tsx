@@ -15,9 +15,10 @@ interface Props {
   reset: () => Promise<void>;
   startCapture: (tabId: number) => Promise<{ ok: true } | { ok: false; error: string }>;
   startOptimize: () => Promise<{ ok: true } | { ok: false; error: string }>;
+  onOpenAutofill: () => void;
 }
 
-export function Listing({ job, reset, startCapture, startOptimize }: Props) {
+export function Listing({ job, reset, startCapture, startOptimize, onOpenAutofill }: Props) {
   const { tab } = useActiveTab();
   const { state: resumeState } = useResume();
 
@@ -66,6 +67,12 @@ export function Listing({ job, reset, startCapture, startOptimize }: Props) {
             }}
           >
             ✦ {lowConfidence ? "Optimize anyway" : "Optimize for this role"}
+          </Button>
+          <Button
+            onClick={() => onOpenAutofill()}
+            sx={{ padding: "9px 12px", border: `1px solid #1f2937`, color: DIM, fontSize: 12 }}
+          >
+            Autofill
           </Button>
           <Button
             onClick={() => void reset()}
@@ -166,6 +173,17 @@ export function Listing({ job, reset, startCapture, startOptimize }: Props) {
 
       {!captured && !capturing && !captureFailed && tab && (
         <CurrentTabCard hostname={tabHostname} title={tab.title} />
+      )}
+
+      {resumeState.kind === "ready" && (
+        <Button
+          variant="outlined"
+          fullWidth
+          onClick={() => onOpenAutofill()}
+          sx={{ borderColor: ACCENT, color: ACCENT, mt: 1 }}
+        >
+          Autofill this page
+        </Button>
       )}
 
       {/* Resume status block */}
