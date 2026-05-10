@@ -17,6 +17,8 @@ import {
   type AuthChangedEvent,
   type GetActiveTabResponse,
   type GetAuthStateResponse,
+  type InjectAutofillRequest,
+  type InjectAutofillResponse,
   type PanelToBackground,
   type SignOutResponse,
   type JobStartOptimizeResponse,
@@ -109,6 +111,45 @@ async function fetchOptimization(id: number): Promise<OptimizationSummary> {
     recruiterReview: c.recruiterReview ?? "",
     completedAt: c.completedAt ?? null,
   };
+}
+
+// ─── Autofill injection ──────────────────────────────────────────────────
+
+function isInjectableUrl(url: string): boolean {
+  if (!url) return false;
+  try {
+    const u = new URL(url);
+    if (["chrome:", "chrome-extension:", "edge:", "about:"].includes(u.protocol)) return false;
+    if (u.protocol === "view-source:") return false;
+    if (u.hostname === "chrome.google.com" && u.pathname.startsWith("/webstore")) return false;
+    return ["http:", "https:", "file:"].includes(u.protocol);
+  } catch {
+    return false;
+  }
+}
+
+async function injectAutofill(tabId: number): Promise<InjectAutofillResponse> {
+  let tab: chrome.tabs.Tab | undefined;
+  try {
+    tab = await chrome.tabs.get(tabId);
+  } catch (err) {
+    return { ok: false, error: `tab ${tabId} not found` };
+  }
+  if (!isInjectableUrl(tab.url || "")) {
+    return { ok: false, error: "Can't run on this page." };
+  }
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: ["content-autofill.js"],
+    });
+    return { ok: true };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "injection failed",
+    };
+  }
 }
 
 // ─── Capture lifecycle ───────────────────────────────────────────────────
@@ -402,6 +443,12 @@ chrome.runtime.onMessage.addListener(
             url: tab.url,
             title: tab.title || "",
           };
+          sendResponse(r);
+          return;
+        }
+        case "INJECT_AUTOFILL": {
+          const m = message as InjectAutofillRequest;
+          const r = await injectAutofill(m.tabId);
           sendResponse(r);
           return;
         }
