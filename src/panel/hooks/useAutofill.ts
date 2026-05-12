@@ -41,6 +41,7 @@ function decodeAutofillResponse(raw: unknown): AutofillResponse {
     values: (r.values as Record<string, FieldValue>) ?? {},
     matched: (r.matched as AutofillResponse["matched"]) ?? {},
     aiDrafted: (r.ai_drafted as string[]) ?? [],
+    memoryMatched: (r.memory_matched as string[]) ?? [],
     unmatched: (r.unmatched as string[]) ?? [],
     profile: camelizeProfile((r.profile as Record<string, unknown>) ?? {}),
   };
@@ -236,6 +237,28 @@ export function useAutofill(): UseAutofill {
       setState({ kind: "error", message: fillRes.error });
       return;
     }
+
+    // Fire-and-forget: commit non-profile answers to semantic memory.
+    const snap = snapshot as Extract<AutofillState, { kind: "reviewing" }>;
+    const profileFieldIds = new Set(Object.keys(snap.response.matched));
+    const entries = snap.schema
+      .filter((f) => !profileFieldIds.has(f.id) && f.kind !== "checkbox")
+      .map((f) => ({ id: f.id, label: f.label, kind: f.kind }))
+      .filter((f) => {
+        const v = snap.values[f.id];
+        return v !== undefined && v !== "" && !(Array.isArray(v) && v.length === 0);
+      })
+      .map((f) => ({ label: f.label, kind: f.kind, value: snap.values[f.id] }));
+
+    if (entries.length > 0) {
+      apiFetch("/api/applicant/autofill/commit/", {
+        method: "POST",
+        body: JSON.stringify({ entries }),
+      }).catch(() => {
+        // best-effort — memory commit failures are silent
+      });
+    }
+
     setState({
       kind: "done",
       filled: fillRes.filled,

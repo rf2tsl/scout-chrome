@@ -41,6 +41,7 @@ export function ReviewStep({
 
   const aiDrafted = useMemo(() => new Set(response.aiDrafted), [response.aiDrafted]);
   const matched = useMemo(() => new Set(Object.keys(response.matched)), [response.matched]);
+  const memory = useMemo(() => new Set(response.memoryMatched), [response.memoryMatched]);
   const cantFill = useMemo(
     () =>
       schema.filter(
@@ -69,8 +70,9 @@ export function ReviewStep({
     return v === undefined || v === "" || v === null;
   });
 
-  const fieldStatus = (f: FieldSpec): "matched" | "ai_drafted" | "unmatched" => {
+  const fieldStatus = (f: FieldSpec): "matched" | "memory" | "ai_drafted" | "unmatched" => {
     if (matched.has(f.id)) return "matched";
+    if (memory.has(f.id)) return "memory";
     if (aiDrafted.has(f.id)) return "ai_drafted";
     return "unmatched";
   };
