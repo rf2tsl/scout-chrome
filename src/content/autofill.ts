@@ -150,25 +150,71 @@ function buildHint(el: HTMLElement): string {
   return parts.join(" ");
 }
 
-function scanForm(): FieldSpec[] {
+/**
+ * Open a combobox programmatically, scrape the option labels from the
+ * listbox referenced by `aria-controls`, then close it. Best-effort: any
+ * failure returns an empty array so the field falls back to text input.
+ */
+async function scrapeComboboxOptions(input: HTMLElement): Promise<string[]> {
+  try {
+    input.focus();
+    // ArrowDown is the canonical "open menu" key for the WAI-ARIA combobox
+    // pattern; works across react-select, Headless UI, and Downshift.
+    input.dispatchEvent(new KeyboardEvent("keydown", {
+      key: "ArrowDown", code: "ArrowDown", bubbles: true,
+    }));
+
+    // One rAF + 50ms is empirically enough for react-select's portal to render.
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => setTimeout(resolve, 50)),
+    );
+
+    const listboxId = input.getAttribute("aria-controls");
+    const listbox = listboxId ? document.getElementById(listboxId) : null;
+    const opts = listbox
+      ? Array.from(listbox.querySelectorAll<HTMLElement>('[role="option"]'))
+          .map((o) => cleanText(o.textContent || ""))
+          .filter(Boolean)
+      : [];
+
+    // Escape closes the menu without committing any option.
+    input.dispatchEvent(new KeyboardEvent("keydown", {
+      key: "Escape", code: "Escape", bubbles: true,
+    }));
+    input.blur();
+    return opts;
+  } catch (err) {
+    console.warn("[scout-autofill] combobox scrape failed", err);
+    return [];
+  }
+}
+
+const COMBOBOX_SCRAPE_CAP = 20;
+
+async function scanForm(): Promise<FieldSpec[]> {
   const out: FieldSpec[] = [];
   const seenRadioGroups = new Set<string>();
 
-  // <input> + <textarea> + <select>
-  document.querySelectorAll<HTMLElement>("input, textarea, select").forEach((el) => {
-    if (!isVisible(el)) return;
+  const elements = Array.from(
+    document.querySelectorAll<HTMLElement>("input, textarea, select"),
+  );
+
+  let comboboxScrapesUsed = 0;
+
+  for (const el of elements) {
+    if (!isVisible(el)) continue;
 
     if (el instanceof HTMLInputElement) {
       if (el.type === "radio") {
         const groupKey = el.name || ensureId(el);
-        if (seenRadioGroups.has(groupKey)) return;
+        if (seenRadioGroups.has(groupKey)) continue;
         seenRadioGroups.add(groupKey);
 
         const peers = el.name
           ? Array.from(document.querySelectorAll<HTMLInputElement>(`input[type=radio][name="${cssEscape(el.name)}"]`))
           : [el];
         const visiblePeers = peers.filter(isVisible);
-        if (!visiblePeers.length) return;
+        if (!visiblePeers.length) continue;
         const firstPeer = visiblePeers[0] as HTMLInputElement;
         const options = visiblePeers
           .map((p) => resolveLabel(p))
@@ -176,9 +222,7 @@ function scanForm(): FieldSpec[] {
         const isYesNo =
           options.length === 2 &&
           options.every((o) => /^(yes|no)$/i.test(o));
-        // Use the first peer's id for stability (or set one).
         const id = ensureId(firstPeer);
-        // Label for the group: use the first peer's surrounding fieldset legend if present, else first option's label parent
         const fieldset = firstPeer.closest("fieldset");
         const legend = fieldset?.querySelector("legend")?.textContent || "";
         out.push({
@@ -189,19 +233,30 @@ function scanForm(): FieldSpec[] {
           options,
           hint: buildHint(firstPeer),
         });
-        return;
+        continue;
       }
       const kind = inputKind(el);
-      if (!kind) return;
+      if (!kind) continue;
+
+      let options: string[] = [];
+      if ((kind === "select" || kind === "multiselect") && el.getAttribute("role") === "combobox") {
+        if (comboboxScrapesUsed < COMBOBOX_SCRAPE_CAP) {
+          options = await scrapeComboboxOptions(el);
+          comboboxScrapesUsed++;
+        } else {
+          console.warn("[scout-autofill] combobox scrape cap reached; skipping option scrape");
+        }
+      }
+
       out.push({
         id: ensureId(el),
         label: resolveLabel(el),
         kind,
         required: el.required,
-        options: [],
+        options,
         hint: buildHint(el),
       });
-      return;
+      continue;
     }
     if (el instanceof HTMLTextAreaElement) {
       out.push({
@@ -212,7 +267,7 @@ function scanForm(): FieldSpec[] {
         options: [],
         hint: buildHint(el),
       });
-      return;
+      continue;
     }
     if (el instanceof HTMLSelectElement) {
       const options = Array.from(el.options)
@@ -228,9 +283,9 @@ function scanForm(): FieldSpec[] {
         options,
         hint: buildHint(el),
       });
-      return;
+      continue;
     }
-  });
+  }
 
   return out;
 }
@@ -344,18 +399,21 @@ function fillForm(values: Record<string, FieldValue>): { filled: number; failed:
 if (!(window as ScoutWindow).__scoutAutofillInstalled) {
   (window as ScoutWindow).__scoutAutofillInstalled = true;
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    try {
-      if (message?.kind === "SCAN_FORM") {
-        sendResponse({ ok: true, fields: scanForm() });
-        return false;
-      }
-      if (message?.kind === "FILL_FORM") {
+    if (message?.kind === "SCAN_FORM") {
+      scanForm()
+        .then((fields) => sendResponse({ ok: true, fields }))
+        .catch((err) =>
+          sendResponse({ ok: false, error: err instanceof Error ? err.message : "scan failed" }),
+        );
+      return true; // keep channel open for async sendResponse
+    }
+    if (message?.kind === "FILL_FORM") {
+      try {
         const result = fillForm(message.values || {});
         sendResponse({ ok: true, ...result });
-        return false;
+      } catch (err) {
+        sendResponse({ ok: false, error: err instanceof Error ? err.message : "fill failed" });
       }
-    } catch (err) {
-      sendResponse({ ok: false, error: err instanceof Error ? err.message : "error" });
       return false;
     }
     return false;
