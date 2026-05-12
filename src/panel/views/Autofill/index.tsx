@@ -1,4 +1,4 @@
-import { Alert, Button, Stack, Typography } from "@mui/material";
+import { Alert, Button, CircularProgress, Stack, Typography } from "@mui/material";
 import { PopupShell } from "../../components/PopupShell";
 import { useActiveTab } from "../../hooks/useActiveTab";
 import { useAutofill } from "../../hooks/useAutofill";
@@ -28,18 +28,23 @@ export function Autofill({ initialOptimizationId, onClose }: Props) {
     );
   }
 
-  if (
-    state.kind === "idle" ||
-    state.kind === "scanning" ||
-    state.kind === "extracting" ||
-    state.kind === "error"
-  ) {
-    const scanning = state.kind === "scanning" || state.kind === "extracting";
+  if (state.kind === "extracting") {
+    return (
+      <PopupShell footer={null}>
+        <Stack alignItems="center" sx={{ py: 4 }} spacing={1}>
+          <CircularProgress size={18} sx={{ color: ACCENT }} />
+          <Typography sx={{ fontSize: 12, color: TEXT }}>Reading job description…</Typography>
+        </Stack>
+      </PopupShell>
+    );
+  }
+
+  if (state.kind === "idle" || state.kind === "scanning" || state.kind === "error") {
     return (
       <PopupShell footer={null}>
         <ScanStep
           defaultOptimizationId={initialOptimizationId}
-          scanning={scanning}
+          scanning={state.kind === "scanning"}
           errorMessage={state.kind === "error" ? state.message : undefined}
           activeTabUrl={tab.url}
           activeTabTitle={tab.title}

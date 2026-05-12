@@ -174,10 +174,20 @@ export function useAutofill(): UseAutofill {
       });
       response = decodeAutofillResponse(raw);
     } catch (err) {
-      const msg =
-        err instanceof ApiError && err.status === 400
-          ? "Source unavailable. Pick another."
-          : toUserMessage(err);
+      let msg: string;
+      if (err instanceof ApiError && err.status === 400) {
+        // The backend returns {detail: "..."} for source-resolution failures
+        // (Resume.DoesNotExist, Optimization.DoesNotExist). Anything else at
+        // 400 is likely a serializer-validation failure (a frontend bug); we
+        // surface the raw message instead of a misleading "pick another".
+        const detail =
+          err.body && typeof err.body === "object" && typeof (err.body as Record<string, unknown>).detail === "string"
+            ? (err.body as Record<string, string>).detail
+            : null;
+        msg = detail ?? toUserMessage(err);
+      } else {
+        msg = toUserMessage(err);
+      }
       setState({ kind: "error", message: msg });
       return;
     }

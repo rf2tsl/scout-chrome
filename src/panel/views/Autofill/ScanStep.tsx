@@ -76,6 +76,11 @@ export function ScanStep({
   const [selected, setSelected] = useState<string | null>(null);
   useEffect(() => {
     if (selected != null) return;
+    // Wait for both data sources to settle before choosing a default —
+    // otherwise we may lock in "base" before optimizations finish loading.
+    if (histState.kind !== "ready") return;
+    if (resumeState.kind !== "ready" && resumeState.kind !== "missing") return;
+
     if (
       defaultOptimizationId != null &&
       optimizations.some((o) => o.id === defaultOptimizationId)
@@ -83,9 +88,8 @@ export function ScanStep({
       setSelected(encodeOptimization(defaultOptimizationId));
       return;
     }
-    const first = options[0];
-    if (first) setSelected(first.value);
-  }, [defaultOptimizationId, optimizations, options, selected]);
+    if (options.length > 0) setSelected(options[0]?.value ?? null);
+  }, [defaultOptimizationId, optimizations, options, selected, histState.kind, resumeState.kind]);
 
   const hostname = useMemo(() => {
     try {
