@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
-import { apiFetch } from "@/shared/api";
 import type { ExtractedListing } from "@/shared/types";
+import { extractListing, snapshotActiveTab, type PageSnapshot } from "./listingExtract";
 
 type State =
   | { kind: "idle" }
@@ -8,36 +8,6 @@ type State =
   | { kind: "extracting" }
   | { kind: "done"; listing: ExtractedListing }
   | { kind: "error"; message: string };
-
-interface PageSnapshot {
-  url: string;
-  title: string;
-  text: string;
-}
-
-const MAX_TEXT_CHARS = 30_000;
-
-// Runs inside the target page (not the extension). Cannot reference module
-// scope — chrome.scripting serializes it.
-function snapshotPage(maxChars: number): PageSnapshot {
-  return {
-    url: location.href,
-    title: document.title,
-    text: (document.body?.innerText || "").slice(0, maxChars),
-  };
-}
-
-async function snapshotActiveTab(tabId: number): Promise<PageSnapshot> {
-  const [result] = await chrome.scripting.executeScript({
-    target: { tabId },
-    func: snapshotPage,
-    args: [MAX_TEXT_CHARS],
-  });
-  if (!result || typeof result.result !== "object" || result.result == null) {
-    throw new Error("page snapshot returned no result");
-  }
-  return result.result as PageSnapshot;
-}
 
 export function useListingExtract(): {
   state: State;
@@ -62,14 +32,7 @@ export function useListingExtract(): {
 
     setState({ kind: "extracting" });
     try {
-      const listing = await apiFetch<ExtractedListing>("/api/discover/extract-listing/", {
-        method: "POST",
-        body: JSON.stringify({
-          url: snapshot.url,
-          page_title: snapshot.title,
-          page_text: snapshot.text,
-        }),
-      });
+      const listing = await extractListing(snapshot);
       setState({ kind: "done", listing });
     } catch (err) {
       const message = err instanceof Error ? err.message : "extraction failed";
