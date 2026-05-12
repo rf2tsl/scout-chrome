@@ -113,6 +113,17 @@ function inputKind(el: HTMLInputElement): FieldSpec["kind"] | null {
 
 function isVisible(el: HTMLElement): boolean {
   if ((el as HTMLInputElement).type === "hidden") return false;
+  // Many React combobox libraries (react-select, Headless UI, Downshift) ship
+  // hidden sentinel inputs to trigger native required-validation. They are
+  // marked aria-hidden + tabindex=-1 and offscreen-positioned via CSS. Skip
+  // them — picking them up creates phantom duplicate fields in the review UI.
+  if (el.getAttribute("aria-hidden") === "true") return false;
+  if (
+    el.getAttribute("tabindex") === "-1" &&
+    /requiredInput/i.test(el.className || "")
+  ) {
+    return false;
+  }
   const cs = getComputedStyle(el);
   if (cs.display === "none" || cs.visibility === "hidden") return false;
   if (el.offsetParent === null && cs.position !== "fixed") return false;
