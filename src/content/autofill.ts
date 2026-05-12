@@ -96,6 +96,16 @@ function ensureId(el: HTMLElement): string {
 }
 
 function inputKind(el: HTMLInputElement): FieldSpec["kind"] | null {
+  // React-style combobox widgets (react-select, Headless UI, Downshift, Radix)
+  // render their visible control as an <input role="combobox"> with the
+  // options portaled into a separate <ul role="listbox">. Treat these as
+  // selects, not as plain text inputs.
+  if (
+    el.getAttribute("role") === "combobox" &&
+    el.getAttribute("aria-haspopup") === "true"
+  ) {
+    return el.getAttribute("aria-multiselectable") === "true" ? "multiselect" : "select";
+  }
   switch (el.type) {
     case "text":
     case "email":
