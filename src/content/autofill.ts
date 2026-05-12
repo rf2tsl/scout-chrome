@@ -100,9 +100,14 @@ function inputKind(el: HTMLInputElement): FieldSpec["kind"] | null {
   // render their visible control as an <input role="combobox"> with the
   // options portaled into a separate <ul role="listbox">. Treat these as
   // selects, not as plain text inputs.
+  // aria-haspopup may be "true" (legacy/react-select) or one of the named
+  // popup-role values like "listbox" (Headless UI, Radix). Accept anything
+  // non-falsy.
+  const haspopup = el.getAttribute("aria-haspopup");
   if (
     el.getAttribute("role") === "combobox" &&
-    el.getAttribute("aria-haspopup") === "true"
+    haspopup !== null &&
+    haspopup !== "false"
   ) {
     return el.getAttribute("aria-multiselectable") === "true" ? "multiselect" : "select";
   }
@@ -430,6 +435,10 @@ async function fillForm(values: Record<string, FieldValue>): Promise<{ filled: n
             for (const v of value) {
               const ok = await fillCombobox(el, String(v));
               if (!ok) allOk = false;
+              // Let react-select's post-commit state flush before the next
+              // iteration — otherwise React's clear of the input may race
+              // with the next native-setter call.
+              await new Promise<void>((r) => setTimeout(r, 50));
             }
             if (allOk) filled++;
             else failed.push(id);
