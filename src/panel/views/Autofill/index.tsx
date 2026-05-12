@@ -28,16 +28,22 @@ export function Autofill({ initialOptimizationId, onClose }: Props) {
     );
   }
 
-  if (state.kind === "idle" || state.kind === "scanning" || state.kind === "error") {
+  if (
+    state.kind === "idle" ||
+    state.kind === "scanning" ||
+    state.kind === "extracting" ||
+    state.kind === "error"
+  ) {
+    const scanning = state.kind === "scanning" || state.kind === "extracting";
     return (
       <PopupShell footer={null}>
         <ScanStep
           defaultOptimizationId={initialOptimizationId}
-          scanning={state.kind === "scanning"}
+          scanning={scanning}
           errorMessage={state.kind === "error" ? state.message : undefined}
           activeTabUrl={tab.url}
           activeTabTitle={tab.title}
-          onScan={(optId) => void scan(optId, tab.tabId)}
+          onScan={(source) => void scan(source, tab.tabId)}
           onCancel={close}
         />
       </PopupShell>

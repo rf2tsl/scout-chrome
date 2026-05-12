@@ -10,8 +10,9 @@ import {
   Typography,
 } from "@mui/material";
 import { useOptimizationHistory } from "../../hooks/useOptimizationHistory";
+import { useResume } from "../../hooks/useResume";
 import { ACCENT, FAINT, MUTED, TEXT } from "../../theme";
-import type { OptimizationListItem } from "@/shared/types";
+import type { AutofillSource, OptimizationListItem } from "@/shared/types";
 
 interface Props {
   defaultOptimizationId: number | null;
@@ -19,8 +20,25 @@ interface Props {
   errorMessage?: string;
   activeTabUrl: string;
   activeTabTitle: string;
-  onScan: (optimizationId: number) => void;
+  onScan: (source: AutofillSource) => void;
   onCancel: () => void;
+}
+
+type Option =
+  | { value: "base"; label: string }
+  | { value: `opt:${number}`; label: string };
+
+function encodeOptimization(id: number): `opt:${number}` {
+  return `opt:${id}` as const;
+}
+
+function decodeSelection(v: string): AutofillSource | null {
+  if (v === "base") return { kind: "base" };
+  if (v.startsWith("opt:")) {
+    const id = Number(v.slice(4));
+    return Number.isFinite(id) ? { kind: "optimization", id } : null;
+  }
+  return null;
 }
 
 export function ScanStep({
@@ -32,15 +50,42 @@ export function ScanStep({
   onScan,
   onCancel,
 }: Props) {
-  const { state } = useOptimizationHistory();
-  const items: OptimizationListItem[] =
-    state.kind === "ready" ? state.items.filter((i) => i.status === "succeeded") : [];
+  const { state: histState } = useOptimizationHistory();
+  const { state: resumeState } = useResume();
 
-  const [selected, setSelected] = useState<number | null>(defaultOptimizationId);
+  const optimizations: OptimizationListItem[] =
+    histState.kind === "ready"
+      ? histState.items.filter((i) => i.status === "succeeded")
+      : [];
+
+  const hasBase = resumeState.kind === "ready";
+  const baseFilename = hasBase ? resumeState.resume.source_filename || "resume" : "";
+
+  const options: Option[] = useMemo(() => {
+    const out: Option[] = [];
+    if (hasBase) out.push({ value: "base", label: `Base resume — ${baseFilename}` });
+    for (const o of optimizations) {
+      out.push({
+        value: encodeOptimization(o.id),
+        label: o.job_context_title || `Optimization #${o.id}`,
+      });
+    }
+    return out;
+  }, [hasBase, baseFilename, optimizations]);
+
+  const [selected, setSelected] = useState<string | null>(null);
   useEffect(() => {
-    const first = items[0];
-    if (selected == null && first != null) setSelected(first.id);
-  }, [items, selected]);
+    if (selected != null) return;
+    if (
+      defaultOptimizationId != null &&
+      optimizations.some((o) => o.id === defaultOptimizationId)
+    ) {
+      setSelected(encodeOptimization(defaultOptimizationId));
+      return;
+    }
+    const first = options[0];
+    if (first) setSelected(first.value);
+  }, [defaultOptimizationId, optimizations, options, selected]);
 
   const hostname = useMemo(() => {
     try {
@@ -50,20 +95,22 @@ export function ScanStep({
     }
   }, [activeTabUrl]);
 
-  if (state.kind === "loading") {
+  const loading = histState.kind === "loading" || resumeState.kind === "loading";
+
+  if (loading) {
     return (
       <Stack alignItems="center" sx={{ py: 4 }}>
         <CircularProgress size={18} sx={{ color: ACCENT }} />
       </Stack>
     );
   }
-  if (state.kind === "error") {
-    return <Alert severity="error">{state.message}</Alert>;
-  }
-  if (items.length === 0) {
+  if (histState.kind === "error") return <Alert severity="error">{histState.message}</Alert>;
+  if (resumeState.kind === "error") return <Alert severity="error">{resumeState.message}</Alert>;
+
+  if (options.length === 0) {
     return (
       <Alert severity="info">
-        Optimize a resume first — the autofill needs at least one to work from.
+        Upload a base resume or run an optimization first — the autofill needs at least one to work from.
       </Alert>
     );
   }
@@ -99,18 +146,18 @@ export function ScanStep({
             mb: 0.5,
           }}
         >
-          Optimization
+          Source
         </Typography>
         <Select
           fullWidth
           size="small"
           value={selected ?? ""}
-          onChange={(e) => setSelected(Number(e.target.value))}
+          onChange={(e) => setSelected(String(e.target.value))}
           sx={{ fontSize: 12, color: TEXT }}
         >
-          {items.map((it) => (
-            <MenuItem key={it.id} value={it.id} sx={{ fontSize: 12 }}>
-              {it.job_context_title || `Optimization #${it.id}`}
+          {options.map((o) => (
+            <MenuItem key={o.value} value={o.value} sx={{ fontSize: 12 }}>
+              {o.label}
             </MenuItem>
           ))}
         </Select>
@@ -123,7 +170,10 @@ export function ScanStep({
           variant="contained"
           fullWidth
           disabled={scanning || selected == null}
-          onClick={() => selected != null && onScan(selected)}
+          onClick={() => {
+            const src = selected ? decodeSelection(selected) : null;
+            if (src) onScan(src);
+          }}
           sx={{
             background: ACCENT,
             color: "#0a0e14",
