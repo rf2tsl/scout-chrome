@@ -4,6 +4,7 @@ import { toUserMessage } from "@/shared/userError";
 import type {
   ApplicantProfile,
   AutofillResponse,
+  AutofillSource,
   FieldSpec,
   FieldValue,
   ProfileAttrName,
@@ -16,6 +17,7 @@ import type {
   ScanFormRequest,
   ScanFormResponse,
 } from "@/shared/messages";
+import { extractListing, snapshotActiveTab } from "./listingExtract";
 
 function camelizeProfile(p: Record<string, unknown>): ApplicantProfile {
   return {
@@ -76,6 +78,7 @@ function decamelize<T extends Record<string, unknown>>(o: T): Record<string, unk
 export type AutofillState =
   | { kind: "idle" }
   | { kind: "scanning" }
+  | { kind: "extracting" }
   | {
       kind: "reviewing";
       schema: FieldSpec[];
@@ -91,7 +94,7 @@ export type AutofillState =
 
 interface UseAutofill {
   state: AutofillState;
-  scan: (optimizationId: number, tabId: number) => Promise<void>;
+  scan: (source: AutofillSource, tabId: number) => Promise<void>;
   setValue: (fieldId: string, value: FieldValue) => void;
   setProfileField: <K extends keyof ApplicantProfile>(key: K, value: ApplicantProfile[K]) => void;
   setSaveProfile: (v: boolean) => void;
@@ -103,7 +106,7 @@ export function useAutofill(): UseAutofill {
   const [state, setState] = useState<AutofillState>({ kind: "idle" });
   const tabIdRef = useRef<number | null>(null);
 
-  const scan = useCallback(async (optimizationId: number, tabId: number) => {
+  const scan = useCallback(async (source: AutofillSource, tabId: number) => {
     setState({ kind: "scanning" });
     tabIdRef.current = tabId;
 
@@ -126,7 +129,7 @@ export function useAutofill(): UseAutofill {
     let scanRes: ScanFormResponse;
     try {
       scanRes = (await chrome.tabs.sendMessage(tabId, scanReq)) as ScanFormResponse;
-    } catch (err) {
+    } catch {
       setState({ kind: "error", message: "Couldn't read the page. Reload and try again." });
       return;
     }
@@ -139,21 +142,41 @@ export function useAutofill(): UseAutofill {
       return;
     }
 
-    // 3. POST to backend.
+    // 3. If the source is the base resume, extract a job context from the
+    //    active tab. Failures fall through with empty context.
+    let jobContext: { title: string; description: string } | undefined;
+    if (source.kind === "base") {
+      setState({ kind: "extracting" });
+      try {
+        const snap = await snapshotActiveTab(tabId);
+        const listing = await extractListing(snap);
+        jobContext = {
+          title: listing.title || "",
+          description: listing.description_markdown || "",
+        };
+      } catch {
+        jobContext = { title: "", description: "" };
+      }
+    }
+
+    // 4. POST to the autofill endpoint.
     let response: AutofillResponse;
     try {
+      const body: Record<string, unknown> = {
+        source,
+        schema: scanRes.fields,
+      };
+      if (jobContext) body.job_context = jobContext;
+
       const raw = await apiFetch<unknown>("/api/applicant/autofill/", {
         method: "POST",
-        body: JSON.stringify({
-          optimization_id: optimizationId,
-          schema: scanRes.fields,
-        }),
+        body: JSON.stringify(body),
       });
       response = decodeAutofillResponse(raw);
     } catch (err) {
       const msg =
         err instanceof ApiError && err.status === 400
-          ? "Optimization unavailable. Pick another."
+          ? "Source unavailable. Pick another."
           : toUserMessage(err);
       setState({ kind: "error", message: msg });
       return;

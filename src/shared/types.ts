@@ -180,3 +180,12 @@ export interface AutofillResponse {
   unmatched: string[];
   profile: ApplicantProfile;
 }
+
+export type AutofillSource =
+  | { kind: "base" }
+  | { kind: "optimization"; id: number };
+
+export interface ExtractedJobContext {
+  title: string;
+  description: string;
+}
