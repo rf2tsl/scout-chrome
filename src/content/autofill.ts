@@ -356,7 +356,51 @@ function setRadioGroup(el: HTMLInputElement, value: string | boolean): boolean {
   return false;
 }
 
-function fillForm(values: Record<string, FieldValue>): { filled: number; failed: string[] } {
+/**
+ * Fill a react-select-style combobox by simulating the typeahead-then-Enter
+ * user flow. Returns true if an option was committed; false if no option
+ * matched the typed value.
+ */
+async function fillCombobox(input: HTMLInputElement, value: string): Promise<boolean> {
+  try {
+    input.focus();
+
+    // Type the value via the native setter so react-select sees it.
+    const desc = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
+    desc?.set?.call(input, value);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+
+    // One rAF + ~80ms for react-select to filter the list and highlight the
+    // first match.
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => setTimeout(resolve, 80)),
+    );
+
+    // If no option got rendered, the typed value didn't match anything.
+    const listboxId = input.getAttribute("aria-controls");
+    const listbox = listboxId ? document.getElementById(listboxId) : null;
+    const firstOption = listbox?.querySelector<HTMLElement>('[role="option"]') ?? null;
+    if (!firstOption) {
+      input.dispatchEvent(new KeyboardEvent("keydown", {
+        key: "Escape", code: "Escape", bubbles: true,
+      }));
+      input.blur();
+      return false;
+    }
+
+    // Enter commits the highlighted (first) option.
+    input.dispatchEvent(new KeyboardEvent("keydown", {
+      key: "Enter", code: "Enter", bubbles: true,
+    }));
+    input.blur();
+    return true;
+  } catch (err) {
+    console.warn("[scout-autofill] combobox fill failed", err);
+    return false;
+  }
+}
+
+async function fillForm(values: Record<string, FieldValue>): Promise<{ filled: number; failed: string[] }> {
   let filled = 0;
   const failed: string[] = [];
   for (const [id, value] of Object.entries(values)) {
@@ -379,6 +423,21 @@ function fillForm(values: Record<string, FieldValue>): { filled: number; failed:
         } else if (el.type === "radio") {
           if (setRadioGroup(el, value as string | boolean)) filled++;
           else failed.push(id);
+        } else if (el.getAttribute("role") === "combobox") {
+          // Multi-select: loop and commit each value.
+          if (Array.isArray(value)) {
+            let allOk = true;
+            for (const v of value) {
+              const ok = await fillCombobox(el, String(v));
+              if (!ok) allOk = false;
+            }
+            if (allOk) filled++;
+            else failed.push(id);
+          } else {
+            const ok = await fillCombobox(el, String(value));
+            if (ok) filled++;
+            else failed.push(id);
+          }
         } else {
           setText(el, String(value));
           filled++;
@@ -408,13 +467,12 @@ if (!(window as ScoutWindow).__scoutAutofillInstalled) {
       return true; // keep channel open for async sendResponse
     }
     if (message?.kind === "FILL_FORM") {
-      try {
-        const result = fillForm(message.values || {});
-        sendResponse({ ok: true, ...result });
-      } catch (err) {
-        sendResponse({ ok: false, error: err instanceof Error ? err.message : "fill failed" });
-      }
-      return false;
+      fillForm(message.values || {})
+        .then((result) => sendResponse({ ok: true, ...result }))
+        .catch((err) =>
+          sendResponse({ ok: false, error: err instanceof Error ? err.message : "fill failed" }),
+        );
+      return true; // keep channel open for async sendResponse
     }
     return false;
   });
