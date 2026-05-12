@@ -176,6 +176,7 @@ export interface AutofillResponse {
   values: Record<string, FieldValue>;
   matched: Record<string, ProfileAttrName>; // field_id -> profile attribute (snake_case)
   aiDrafted: string[];
+  memoryMatched: string[];
   unmatched: string[];
   profile: ApplicantProfile;
 }

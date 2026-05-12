@@ -6,13 +6,14 @@ import { FieldRowOuter } from "./styled";
 interface Props {
   field: FieldSpec;
   value: FieldValue | undefined;
-  status: "matched" | "ai_drafted" | "unmatched";
+  status: "matched" | "ai_drafted" | "memory" | "unmatched";
   onChange: (v: FieldValue) => void;
 }
 
 const STATUS: Record<Props["status"], { label: string; color: string }> = {
   matched: { label: "Matched", color: ACCENT },
   ai_drafted: { label: "AI draft", color: "#a78bfa" },
+  memory: { label: "From memory", color: "#34d399" },
   unmatched: { label: "Unmatched", color: "#f59e0b" },
 };
 
