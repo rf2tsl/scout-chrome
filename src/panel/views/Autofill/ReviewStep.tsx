@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
-import { Alert, Box, Button, Collapse, Stack, Typography } from "@mui/material";
+import { Alert, Box, Button, Collapse, Stack } from "@mui/material";
 import type { AutofillResponse, FieldSpec, FieldValue, ApplicantProfile } from "@/shared/types";
 import { CouldntFillList } from "./CouldntFillList";
 import { FieldRow } from "./FieldRow";
 import { ProfileSection } from "./ProfileSection";
 import { SectionCard, SectionHeader } from "./styled";
-import { ACCENT, MUTED, TEXT } from "../../theme";
+import { ACCENT, MUTED } from "../../theme";
 import type { ProfileFieldKey } from "./types";
 
 interface Props {
@@ -63,12 +63,6 @@ export function ReviewStep({
   const aiFailed =
     response.aiDrafted.length === 0 &&
     schema.some((f) => f.kind === "textarea" && !matched.has(f.id));
-
-  const requiredEmpty = editableFields.some((f) => {
-    if (!f.required) return false;
-    const v = values[f.id];
-    return v === undefined || v === "" || v === null;
-  });
 
   const fieldStatus = (f: FieldSpec): "matched" | "memory" | "ai_drafted" | "unmatched" => {
     if (matched.has(f.id)) return "matched";
@@ -139,7 +133,7 @@ export function ReviewStep({
         <Button
           variant="contained"
           fullWidth
-          disabled={filling || requiredEmpty}
+          disabled={filling}
           onClick={onFill}
           sx={{
             background: ACCENT,
@@ -153,11 +147,6 @@ export function ReviewStep({
           Cancel
         </Button>
       </Stack>
-      {requiredEmpty && (
-        <Typography sx={{ fontSize: 10, color: TEXT }}>
-          Required fields are empty — fill them above to enable Fill page.
-        </Typography>
-      )}
     </Stack>
   );
 }
