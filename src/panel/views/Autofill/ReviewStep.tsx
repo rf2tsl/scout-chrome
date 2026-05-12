@@ -62,7 +62,7 @@ export function ReviewStep({
 
   const aiFailed =
     response.aiDrafted.length === 0 &&
-    schema.some((f) => f.kind === "textarea" && !matched.has(f.id));
+    schema.some((f) => f.kind === "textarea" && !matched.has(f.id) && !memory.has(f.id));
 
   const fieldStatus = (f: FieldSpec): "matched" | "memory" | "ai_drafted" | "unmatched" => {
     if (matched.has(f.id)) return "matched";
