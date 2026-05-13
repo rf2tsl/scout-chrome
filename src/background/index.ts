@@ -15,6 +15,7 @@ import {
 } from "@/shared/jobStore";
 import {
   type AuthChangedEvent,
+  type FillFromValuesViaTabRequest,
   type GetActiveTabResponse,
   type GetAuthStateResponse,
   type InjectAutofillRequest,
@@ -421,10 +422,39 @@ chrome.runtime.onMessage.addListener(
       | { kind: "JOB_START_CAPTURE"; tabId: number }
       | { kind: "JOB_START_OPTIMIZE" }
       | { kind: "JOB_RESET" }
-      | { kind: "FETCH_LOCKED_DRAFT"; boardSlug: string; atsExternalId: string },
+      | { kind: "FETCH_LOCKED_DRAFT"; boardSlug: string; atsExternalId: string }
+      | FillFromValuesViaTabRequest,
     sender,
     sendResponse,
   ): boolean => {
+    // Content-script branches — distinguished by sender.tab?.id being present.
+    // Panel messages come from the extension popup: sender.tab is undefined.
+    // Content-script messages have sender.tab.id set by Chrome.
+    const msg = message;
+    if (msg.kind === "INJECT_AUTOFILL" && sender.tab?.id) {
+      // Content-script caller: use the sender's own tab instead of msg.tabId.
+      void injectAutofill(sender.tab.id).then(sendResponse);
+      return true;
+    }
+    if (msg.kind === "FILL_FROM_VALUES_VIA_TAB" && sender.tab?.id) {
+      const tabId = sender.tab.id;
+      chrome.tabs.sendMessage(
+        tabId,
+        { kind: "FILL_FROM_VALUES", values: (msg as FillFromValuesViaTabRequest).values },
+        (resp) => {
+          if (chrome.runtime.lastError) {
+            sendResponse({
+              ok: false,
+              error: chrome.runtime.lastError.message ?? "no response",
+            });
+          } else {
+            sendResponse(resp);
+          }
+        },
+      );
+      return true;
+    }
+
     void (async () => {
       switch (message.kind) {
         case "GET_AUTH_STATE": {
@@ -466,6 +496,7 @@ chrome.runtime.onMessage.addListener(
           return;
         }
         case "INJECT_AUTOFILL": {
+          // Panel caller: uses explicit msg.tabId.
           const m = message as InjectAutofillRequest;
           const r = await injectAutofill(m.tabId);
           sendResponse(r);

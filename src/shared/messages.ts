@@ -84,6 +84,13 @@ export type FillFromValuesResponse =
   | { ok: true; filled: number; failed: string[] }
   | { ok: false; error: string };
 
+// Content script → Background → injected autofill (round-trip).
+export type FillFromValuesViaTabRequest = {
+  kind: "FILL_FROM_VALUES_VIA_TAB";
+  values: Record<string, FieldValue>;
+};
+export type FillFromValuesViaTabResponse = FillFromValuesResponse;
+
 // Background → Panel broadcast (via chrome.runtime.sendMessage to all clients)
 
 export type AuthChangedEvent = { kind: "AUTH_CHANGED"; state: AuthState };
