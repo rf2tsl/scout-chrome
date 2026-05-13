@@ -96,21 +96,6 @@ function ensureId(el: HTMLElement): string {
 }
 
 function inputKind(el: HTMLInputElement): FieldSpec["kind"] | null {
-  // React-style combobox widgets (react-select, Headless UI, Downshift, Radix)
-  // render their visible control as an <input role="combobox"> with the
-  // options portaled into a separate <ul role="listbox">. Treat these as
-  // selects, not as plain text inputs.
-  // aria-haspopup may be "true" (legacy/react-select) or one of the named
-  // popup-role values like "listbox" (Headless UI, Radix). Accept anything
-  // non-falsy.
-  const haspopup = el.getAttribute("aria-haspopup");
-  if (
-    el.getAttribute("role") === "combobox" &&
-    haspopup !== null &&
-    haspopup !== "false"
-  ) {
-    return el.getAttribute("aria-multiselectable") === "true" ? "multiselect" : "select";
-  }
   switch (el.type) {
     case "text":
     case "email":
@@ -128,17 +113,6 @@ function inputKind(el: HTMLInputElement): FieldSpec["kind"] | null {
 
 function isVisible(el: HTMLElement): boolean {
   if ((el as HTMLInputElement).type === "hidden") return false;
-  // Many React combobox libraries (react-select, Headless UI, Downshift) ship
-  // hidden sentinel inputs to trigger native required-validation. They are
-  // marked aria-hidden + tabindex=-1 and offscreen-positioned via CSS. Skip
-  // them — picking them up creates phantom duplicate fields in the review UI.
-  if (el.getAttribute("aria-hidden") === "true") return false;
-  if (
-    el.getAttribute("tabindex") === "-1" &&
-    /requiredInput/i.test(el.className || "")
-  ) {
-    return false;
-  }
   const cs = getComputedStyle(el);
   if (cs.display === "none" || cs.visibility === "hidden") return false;
   if (el.offsetParent === null && cs.position !== "fixed") return false;
@@ -155,71 +129,25 @@ function buildHint(el: HTMLElement): string {
   return parts.join(" ");
 }
 
-/**
- * Open a combobox programmatically, scrape the option labels from the
- * listbox referenced by `aria-controls`, then close it. Best-effort: any
- * failure returns an empty array so the field falls back to text input.
- */
-async function scrapeComboboxOptions(input: HTMLElement): Promise<string[]> {
-  try {
-    input.focus();
-    // ArrowDown is the canonical "open menu" key for the WAI-ARIA combobox
-    // pattern; works across react-select, Headless UI, and Downshift.
-    input.dispatchEvent(new KeyboardEvent("keydown", {
-      key: "ArrowDown", code: "ArrowDown", bubbles: true,
-    }));
-
-    // One rAF + 50ms is empirically enough for react-select's portal to render.
-    await new Promise<void>((resolve) =>
-      requestAnimationFrame(() => setTimeout(resolve, 50)),
-    );
-
-    const listboxId = input.getAttribute("aria-controls");
-    const listbox = listboxId ? document.getElementById(listboxId) : null;
-    const opts = listbox
-      ? Array.from(listbox.querySelectorAll<HTMLElement>('[role="option"]'))
-          .map((o) => cleanText(o.textContent || ""))
-          .filter(Boolean)
-      : [];
-
-    // Escape closes the menu without committing any option.
-    input.dispatchEvent(new KeyboardEvent("keydown", {
-      key: "Escape", code: "Escape", bubbles: true,
-    }));
-    input.blur();
-    return opts;
-  } catch (err) {
-    console.warn("[scout-autofill] combobox scrape failed", err);
-    return [];
-  }
-}
-
-const COMBOBOX_SCRAPE_CAP = 20;
-
-async function scanForm(): Promise<FieldSpec[]> {
+function scanForm(): FieldSpec[] {
   const out: FieldSpec[] = [];
   const seenRadioGroups = new Set<string>();
 
-  const elements = Array.from(
-    document.querySelectorAll<HTMLElement>("input, textarea, select"),
-  );
-
-  let comboboxScrapesUsed = 0;
-
-  for (const el of elements) {
-    if (!isVisible(el)) continue;
+  // <input> + <textarea> + <select>
+  document.querySelectorAll<HTMLElement>("input, textarea, select").forEach((el) => {
+    if (!isVisible(el)) return;
 
     if (el instanceof HTMLInputElement) {
       if (el.type === "radio") {
         const groupKey = el.name || ensureId(el);
-        if (seenRadioGroups.has(groupKey)) continue;
+        if (seenRadioGroups.has(groupKey)) return;
         seenRadioGroups.add(groupKey);
 
         const peers = el.name
           ? Array.from(document.querySelectorAll<HTMLInputElement>(`input[type=radio][name="${cssEscape(el.name)}"]`))
           : [el];
         const visiblePeers = peers.filter(isVisible);
-        if (!visiblePeers.length) continue;
+        if (!visiblePeers.length) return;
         const firstPeer = visiblePeers[0] as HTMLInputElement;
         const options = visiblePeers
           .map((p) => resolveLabel(p))
@@ -227,7 +155,9 @@ async function scanForm(): Promise<FieldSpec[]> {
         const isYesNo =
           options.length === 2 &&
           options.every((o) => /^(yes|no)$/i.test(o));
+        // Use the first peer's id for stability (or set one).
         const id = ensureId(firstPeer);
+        // Label for the group: use the first peer's surrounding fieldset legend if present, else first option's label parent
         const fieldset = firstPeer.closest("fieldset");
         const legend = fieldset?.querySelector("legend")?.textContent || "";
         out.push({
@@ -238,30 +168,19 @@ async function scanForm(): Promise<FieldSpec[]> {
           options,
           hint: buildHint(firstPeer),
         });
-        continue;
+        return;
       }
       const kind = inputKind(el);
-      if (!kind) continue;
-
-      let options: string[] = [];
-      if ((kind === "select" || kind === "multiselect") && el.getAttribute("role") === "combobox") {
-        if (comboboxScrapesUsed < COMBOBOX_SCRAPE_CAP) {
-          options = await scrapeComboboxOptions(el);
-          comboboxScrapesUsed++;
-        } else {
-          console.warn("[scout-autofill] combobox scrape cap reached; skipping option scrape");
-        }
-      }
-
+      if (!kind) return;
       out.push({
         id: ensureId(el),
         label: resolveLabel(el),
         kind,
         required: el.required,
-        options,
+        options: [],
         hint: buildHint(el),
       });
-      continue;
+      return;
     }
     if (el instanceof HTMLTextAreaElement) {
       out.push({
@@ -272,7 +191,7 @@ async function scanForm(): Promise<FieldSpec[]> {
         options: [],
         hint: buildHint(el),
       });
-      continue;
+      return;
     }
     if (el instanceof HTMLSelectElement) {
       const options = Array.from(el.options)
@@ -288,9 +207,9 @@ async function scanForm(): Promise<FieldSpec[]> {
         options,
         hint: buildHint(el),
       });
-      continue;
+      return;
     }
-  }
+  });
 
   return out;
 }
@@ -361,51 +280,7 @@ function setRadioGroup(el: HTMLInputElement, value: string | boolean): boolean {
   return false;
 }
 
-/**
- * Fill a react-select-style combobox by simulating the typeahead-then-Enter
- * user flow. Returns true if an option was committed; false if no option
- * matched the typed value.
- */
-async function fillCombobox(input: HTMLInputElement, value: string): Promise<boolean> {
-  try {
-    input.focus();
-
-    // Type the value via the native setter so react-select sees it.
-    const desc = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
-    desc?.set?.call(input, value);
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-
-    // One rAF + ~80ms for react-select to filter the list and highlight the
-    // first match.
-    await new Promise<void>((resolve) =>
-      requestAnimationFrame(() => setTimeout(resolve, 80)),
-    );
-
-    // If no option got rendered, the typed value didn't match anything.
-    const listboxId = input.getAttribute("aria-controls");
-    const listbox = listboxId ? document.getElementById(listboxId) : null;
-    const firstOption = listbox?.querySelector<HTMLElement>('[role="option"]') ?? null;
-    if (!firstOption) {
-      input.dispatchEvent(new KeyboardEvent("keydown", {
-        key: "Escape", code: "Escape", bubbles: true,
-      }));
-      input.blur();
-      return false;
-    }
-
-    // Enter commits the highlighted (first) option.
-    input.dispatchEvent(new KeyboardEvent("keydown", {
-      key: "Enter", code: "Enter", bubbles: true,
-    }));
-    input.blur();
-    return true;
-  } catch (err) {
-    console.warn("[scout-autofill] combobox fill failed", err);
-    return false;
-  }
-}
-
-async function fillForm(values: Record<string, FieldValue>): Promise<{ filled: number; failed: string[] }> {
+function fillForm(values: Record<string, FieldValue>): { filled: number; failed: string[] } {
   let filled = 0;
   const failed: string[] = [];
   for (const [id, value] of Object.entries(values)) {
@@ -428,25 +303,6 @@ async function fillForm(values: Record<string, FieldValue>): Promise<{ filled: n
         } else if (el.type === "radio") {
           if (setRadioGroup(el, value as string | boolean)) filled++;
           else failed.push(id);
-        } else if (el.getAttribute("role") === "combobox") {
-          // Multi-select: loop and commit each value.
-          if (Array.isArray(value)) {
-            let allOk = true;
-            for (const v of value) {
-              const ok = await fillCombobox(el, String(v));
-              if (!ok) allOk = false;
-              // Let react-select's post-commit state flush before the next
-              // iteration — otherwise React's clear of the input may race
-              // with the next native-setter call.
-              await new Promise<void>((r) => setTimeout(r, 50));
-            }
-            if (allOk) filled++;
-            else failed.push(id);
-          } else {
-            const ok = await fillCombobox(el, String(value));
-            if (ok) filled++;
-            else failed.push(id);
-          }
         } else {
           setText(el, String(value));
           filled++;
@@ -467,21 +323,19 @@ async function fillForm(values: Record<string, FieldValue>): Promise<{ filled: n
 if (!(window as ScoutWindow).__scoutAutofillInstalled) {
   (window as ScoutWindow).__scoutAutofillInstalled = true;
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    if (message?.kind === "SCAN_FORM") {
-      scanForm()
-        .then((fields) => sendResponse({ ok: true, fields }))
-        .catch((err) =>
-          sendResponse({ ok: false, error: err instanceof Error ? err.message : "scan failed" }),
-        );
-      return true; // keep channel open for async sendResponse
-    }
-    if (message?.kind === "FILL_FORM") {
-      fillForm(message.values || {})
-        .then((result) => sendResponse({ ok: true, ...result }))
-        .catch((err) =>
-          sendResponse({ ok: false, error: err instanceof Error ? err.message : "fill failed" }),
-        );
-      return true; // keep channel open for async sendResponse
+    try {
+      if (message?.kind === "SCAN_FORM") {
+        sendResponse({ ok: true, fields: scanForm() });
+        return false;
+      }
+      if (message?.kind === "FILL_FORM") {
+        const result = fillForm(message.values || {});
+        sendResponse({ ok: true, ...result });
+        return false;
+      }
+    } catch (err) {
+      sendResponse({ ok: false, error: err instanceof Error ? err.message : "error" });
+      return false;
     }
     return false;
   });
