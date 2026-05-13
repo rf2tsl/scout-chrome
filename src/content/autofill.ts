@@ -219,7 +219,8 @@ function scanForm(): FieldSpec[] {
 function findElementById(id: string): HTMLElement | null {
   return (
     document.querySelector<HTMLElement>(`[${FID_ATTR}="${cssEscape(id)}"]`) ||
-    document.getElementById(id)
+    document.getElementById(id) ||
+    document.querySelector<HTMLElement>(`[name="${cssEscape(id)}"]`)
   );
 }
 
@@ -329,6 +330,15 @@ if (!(window as ScoutWindow).__scoutAutofillInstalled) {
         return false;
       }
       if (message?.kind === "FILL_FORM") {
+        const result = fillForm(message.values || {});
+        sendResponse({ ok: true, ...result });
+        return false;
+      }
+      if (message?.kind === "FILL_FROM_VALUES") {
+        // Scan first to assign data-scout-fid IDs for later lookups, then fill
+        // using the same matcher. Locked-draft IDs are Greenhouse question
+        // names, which findElementById now also matches via [name="…"].
+        scanForm();
         const result = fillForm(message.values || {});
         sendResponse({ ok: true, ...result });
         return false;
