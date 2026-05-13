@@ -38,6 +38,14 @@
       ],
       "js": ["content.js"],
       "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://job-boards.greenhouse.io/*/jobs/*",
+        "https://boards.greenhouse.io/*/jobs/*"
+      ],
+      "js": ["content-apply-banner.js"],
+      "run_at": "document_idle"
     }
   ]
 }

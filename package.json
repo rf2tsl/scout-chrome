@@ -7,8 +7,8 @@
     "node": ">=18"
   },
   "scripts": {
-    "dev": "vite build --watch --mode development & SCOUT_CONTENT_ENTRY=extension-link vite build -c vite.content.config.ts --watch & SCOUT_CONTENT_ENTRY=autofill vite build -c vite.content.config.ts --watch",
-    "build": "vite build && SCOUT_CONTENT_ENTRY=extension-link vite build -c vite.content.config.ts && SCOUT_CONTENT_ENTRY=autofill vite build -c vite.content.config.ts",
+    "dev": "vite build --watch --mode development & SCOUT_CONTENT_ENTRY=extension-link vite build -c vite.content.config.ts --watch & SCOUT_CONTENT_ENTRY=autofill vite build -c vite.content.config.ts --watch & SCOUT_CONTENT_ENTRY=apply-banner vite build -c vite.content.config.ts --watch",
+    "build": "vite build && SCOUT_CONTENT_ENTRY=extension-link vite build -c vite.content.config.ts && SCOUT_CONTENT_ENTRY=autofill vite build -c vite.content.config.ts && SCOUT_CONTENT_ENTRY=apply-banner vite build -c vite.content.config.ts",
     "build:wsl": "npm run build && bash scripts/copy-dist-windows.sh",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist node_modules"

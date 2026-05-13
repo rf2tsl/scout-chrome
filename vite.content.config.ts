@@ -2,8 +2,8 @@ import { defineConfig } from "vite";
 import path from "node:path";
 
 /**
- * Build the two content scripts as standalone IIFEs (MV3 content scripts
- * cannot be ES modules). Two separate `vite build` invocations because each
+ * Build the content scripts as standalone IIFEs (MV3 content scripts
+ * cannot be ES modules). Separate `vite build` invocations because each
  * script needs distinct rollup output config.
  */
 const which = process.env.SCOUT_CONTENT_ENTRY ?? "extension-link";
@@ -16,6 +16,10 @@ const ENTRIES: Record<string, { input: string; outFile: string }> = {
   autofill: {
     input: path.resolve(__dirname, "src/content/autofill.ts"),
     outFile: "content-autofill.js",
+  },
+  "apply-banner": {
+    input: path.resolve(__dirname, "src/content/applyBanner.ts"),
+    outFile: "content-apply-banner.js",
   },
 };
 
