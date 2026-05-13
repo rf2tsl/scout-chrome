@@ -30,7 +30,7 @@ import {
   loadToken,
   saveToken,
 } from "@/shared/storage";
-import type { AuthState } from "@/shared/types";
+import type { AuthState, LockedDraft } from "@/shared/types";
 
 // The toolbar action opens the popup directly via manifest's
 // `action.default_popup`, so no chrome.sidePanel wiring is needed.
@@ -149,6 +149,24 @@ async function injectAutofill(tabId: number): Promise<InjectAutofillResponse> {
       ok: false,
       error: err instanceof Error ? err.message : "injection failed",
     };
+  }
+}
+
+async function fetchLockedDraft(
+  boardSlug: string,
+  atsExternalId: string,
+): Promise<{ ok: true; draft: LockedDraft | null } | { ok: false; error: string }> {
+  try {
+    const resp = await authedFetch(
+      `/api/applicant/drafts/by-ats/?board_slug=${encodeURIComponent(boardSlug)}` +
+      `&ats_external_id=${encodeURIComponent(atsExternalId)}`,
+    );
+    if (resp.status === 404) return { ok: true, draft: null };
+    if (!resp.ok) return { ok: false, error: `HTTP ${resp.status}` };
+    const raw = await resp.json();
+    return { ok: true, draft: camelize<LockedDraft>(raw) };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "fetch failed" };
   }
 }
 
@@ -402,7 +420,8 @@ chrome.runtime.onMessage.addListener(
       | LinkTokenMessage
       | { kind: "JOB_START_CAPTURE"; tabId: number }
       | { kind: "JOB_START_OPTIMIZE" }
-      | { kind: "JOB_RESET" },
+      | { kind: "JOB_RESET" }
+      | { kind: "FETCH_LOCKED_DRAFT"; boardSlug: string; atsExternalId: string },
     sender,
     sendResponse,
   ): boolean => {
@@ -481,6 +500,12 @@ chrome.runtime.onMessage.addListener(
           await chrome.alarms.clear(POLL_ALARM);
           await chrome.action.setBadgeText({ text: "" });
           const r: JobResetResponse = { ok: true };
+          sendResponse(r);
+          return;
+        }
+        case "FETCH_LOCKED_DRAFT": {
+          const m = message as { kind: "FETCH_LOCKED_DRAFT"; boardSlug: string; atsExternalId: string };
+          const r = await fetchLockedDraft(m.boardSlug, m.atsExternalId);
           sendResponse(r);
           return;
         }
