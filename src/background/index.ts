@@ -164,8 +164,12 @@ async function fetchLockedDraft(
     );
     if (resp.status === 404) return { ok: true, draft: null };
     if (!resp.ok) return { ok: false, error: `HTTP ${resp.status}` };
-    const raw = await resp.json();
-    return { ok: true, draft: camelize<LockedDraft>(raw) };
+    const raw = await resp.json() as { answers?: Record<string, unknown> } & Record<string, unknown>;
+    const draft = camelize<LockedDraft>(raw);
+    // Preserve raw answer keys — they're Greenhouse question names that must
+    // match the DOM's name="..." attribute, not field names to camelize.
+    draft.answers = (raw.answers ?? {}) as LockedDraft["answers"];
+    return { ok: true, draft };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "fetch failed" };
   }
