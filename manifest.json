@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Scout",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Optimize your resume for the job listing you're viewing.",
   "permissions": ["storage", "activeTab", "scripting", "tabs", "alarms"],
   "host_permissions": [
