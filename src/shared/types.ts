@@ -189,3 +189,11 @@ export interface ExtractedJobContext {
   title: string;
   description: string;
 }
+
+// Locked apply-draft fetched from Scout backend.
+export interface LockedDraft {
+  answers: Record<string, FieldValue>;
+  schema: { questions: FieldSpec[] } | null;
+  lockedAt: string;
+  job: { id: number; company: string; title: string };
+}

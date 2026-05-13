@@ -1,6 +1,6 @@
 // Typed protocol for chrome.runtime.sendMessage between panel ↔ background ↔ content.
 
-import type { AuthState, FieldSpec, FieldValue } from "./types";
+import type { AuthState, FieldSpec, FieldValue, LockedDraft } from "./types";
 
 // Panel ↔ Background --------------------------------------------------------
 
@@ -63,6 +63,27 @@ export type FillFormResponse =
   | { ok: true; filled: number; failed: string[] }
   | { ok: false; error: string };
 
+// Banner → Background ──────────────────────────────────────────────────────
+
+export type FetchLockedDraftRequest = {
+  kind: "FETCH_LOCKED_DRAFT";
+  boardSlug: string;
+  atsExternalId: string;
+};
+export type FetchLockedDraftResponse =
+  | { ok: true; draft: LockedDraft }
+  | { ok: true; draft: null }
+  | { ok: false; error: string };
+
+// Banner/Panel → Content (autofill module).
+export type FillFromValuesRequest = {
+  kind: "FILL_FROM_VALUES";
+  values: Record<string, FieldValue>;
+};
+export type FillFromValuesResponse =
+  | { ok: true; filled: number; failed: string[] }
+  | { ok: false; error: string };
+
 // Background → Panel broadcast (via chrome.runtime.sendMessage to all clients)
 
 export type AuthChangedEvent = { kind: "AUTH_CHANGED"; state: AuthState };
@@ -74,10 +95,14 @@ export type PanelToBackground =
   | SignOutRequest
   | OpenSignInRequest
   | GetActiveTabRequest
-  | InjectAutofillRequest;
+  | InjectAutofillRequest
+  | FetchLockedDraftRequest;
 
 export type BackgroundToPanel = AuthChangedEvent;
 
 export type AnyToContent = ExtractPageRequest;
 
-export type AnyToContentAutofill = ScanFormRequest | FillFormRequest;
+export type AnyToContentAutofill =
+  | ScanFormRequest
+  | FillFormRequest
+  | FillFromValuesRequest;
