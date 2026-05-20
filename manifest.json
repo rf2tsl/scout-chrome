@@ -1,0 +1,51 @@
+{
+  "manifest_version": 3,
+  "name": "Scout",
+  "version": "0.1.1",
+  "description": "Optimize your resume for the job listing you're viewing.",
+  "permissions": ["storage", "activeTab", "scripting", "tabs", "alarms"],
+  "host_permissions": [
+    "https://scout-backend.ngrok.app/*",
+    "http://localhost:8000/*",
+    "https://scout-frontend.ngrok.app/*",
+    "http://localhost:3000/*",
+    "https://patronly-pyrographic-amelie.ngrok-free.dev/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Open Scout",
+    "default_popup": "src/panel/index.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://patronly-pyrographic-amelie.ngrok-free.dev/extension-link*",
+        "https://scout-frontend.ngrok.app/extension-link*",
+        "http://localhost:3000/extension-link*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://job-boards.greenhouse.io/*/jobs/*",
+        "https://boards.greenhouse.io/*/jobs/*"
+      ],
+      "js": ["content-apply-banner.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

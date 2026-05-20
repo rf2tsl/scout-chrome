@@ -1,0 +1,35 @@
+{
+  "name": "scout-chrome",
+  "version": "0.1.1",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "dev": "vite build --watch --mode development & SCOUT_CONTENT_ENTRY=extension-link vite build -c vite.content.config.ts --watch & SCOUT_CONTENT_ENTRY=autofill vite build -c vite.content.config.ts --watch & SCOUT_CONTENT_ENTRY=apply-banner vite build -c vite.content.config.ts --watch",
+    "build": "vite build && SCOUT_CONTENT_ENTRY=extension-link vite build -c vite.content.config.ts && SCOUT_CONTENT_ENTRY=autofill vite build -c vite.content.config.ts && SCOUT_CONTENT_ENTRY=apply-banner vite build -c vite.content.config.ts",
+    "build:wsl": "npm run build && bash scripts/copy-dist-windows.sh",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist node_modules"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.13.3",
+    "@emotion/styled": "^11.13.0",
+    "@mui/icons-material": "^6.1.0",
+    "@mui/material": "^6.1.0",
+    "isomorphic-dompurify": "^2.16.0",
+    "marked": "^14.1.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.270",
+    "@types/node": "^25.6.2",
+    "@types/react": "^18.3.5",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "typescript": "^5.5.4",
+    "vite": "^5.4.6"
+  }
+}
